@@ -31,8 +31,10 @@ flowchart TD
 ```
 
 > [!NOTE]
-> Native apps (Android/iOS) send **no `Origin` header** — the server's `isOriginAllowed` returns `true` for null origins (native bypass).
-> Bearer auth via `Authorization: Bearer <token>` is already accepted at `/api/hrm`.
+> **Authentication & Origin Threat Model:**
+> - **Missing Origin Header**: Native non-browser clients (React Native Android/iOS, desktop native wrappers) do not emit an `Origin` header. The server accepts missing Origin headers (`!origin`) only after enforcing strict `Content-Type: application/json` and non-ambient `Authorization: Bearer <token>` authentication.
+> - **Literal `Origin: "null"` String**: Emitted by browsers in sandboxed iframes, `data:` URIs, or `file://` contexts. The server rejects literal `"null"` origins with HTTP 403 (`Cross-origin request blocked`).
+> - **Ambient Cookie CSRF Protection**: When requests present an ambient `hrm_session` cookie (standard web browsers), the CSRF token in `X-CSRF-Token` is strictly mandatory. Attaching an invalid or dummy Bearer header does not bypass this check.
 
 ---
 

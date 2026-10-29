@@ -2,122 +2,153 @@
 
 **Report Date:** 2026-10-29  
 **Platform Scope:** Android, iOS, Windows, macOS, Web  
-**Root TypeScript Status:** ✅ Clean (exit code 0, 0 errors)  
-**Mobile TypeScript Status:** ✅ Clean (exit code 0, 0 errors)  
-**Expo Doctor Status:** ✅ Clean (18/18 checks passed, 0 errors, 0 warnings)  
+**Root Framework Baseline:** Next.js `16.4.2` · React `^19.3.0`  
+**Mobile Framework Baseline:** Expo `52.0.49` · React Native `0.76.9` · React `18.3.1` · Expo Router `4.0.22`  
+**Production Readiness Status:** ⚠️ **BLOCKED ON EXTERNAL CREDENTIALS, PLATFORM ACCESS & PRODUCTION DATABASE DEPLOYMENT**  
 
 ---
 
-## 1. Multi-Platform Release Matrix
+## 1. Platform-by-Platform Release Matrix
 
-| Platform | Source Validation | Bundle Export | Executable / Native Build | Signed Artifact | Installation Test | Store / Distro Status |
-|---|---|---|---|---|---|---|
-| **Android (Preview APK)** | ✅ 18/18 Expo Doctor; TypeScript 0 errors | ✅ Hermes HBC Bytecode (`3.27 MB`, 1,165 modules) | ⚠️ Cloud Gated (Requires `EXPO_TOKEN` or `eas login`) | ⚠️ Debug Keystore (EAS default) | ⏳ Awaiting EAS APK download | Ready for EAS Preview dispatch |
-| **Android (Prod AAB)** | ✅ Configured for `app-bundle`; Package: `com.finixhr.app` | ✅ Hermes HBC Bytecode (`3.27 MB`, 1,165 modules) | ⚠️ Cloud Gated (Requires `EXPO_TOKEN` or `eas login`) | ⚠️ Google Play Signing Key required | ⏳ Post-build | Awaiting Play Console service account key |
-| **iOS (IPA / TestFlight)** | ✅ Bundle ID: `com.finixhr.app`; Info.plist verified | ✅ Hermes HBC Bytecode (`3.26 MB`, 1,166 modules) | ⚠️ Cloud Gated (Requires macOS runner or EAS iOS) | ⚠️ Apple Developer Team ID / Certs required | ⏳ Post-build | Awaiting Apple Developer credentials |
-| **Windows Desktop (.exe / .msi)**| ✅ Rust 1.99.1, Cargo 1.99.1, MSVC 14.44, WebView2 | N/A (Online Hybrid) | ✅ **BUILT & VERIFIED**<br>• `Finix HR_1.0.0_x64-setup.exe` (`1.83 MiB`)<br>• `Finix HR_1.0.0_x64_en-US.msi` (`2.78 MiB`)<br>• `finix-hr.exe` (`8.45 MiB`) | ⚠️ Unsigned (SmartScreen prompt on install) | ✅ Launchable Windows binary | Ready for Authenticode signing & distribution |
-| **macOS Desktop (.dmg / .app)** | ✅ Tauri v2 configured (`frontendDist: https://oms.finixhr.com`) | N/A (Online Hybrid) | ⚠️ Host Gated (Requires macOS runner; workflow in `.github/workflows/desktop-release.yml`) | ⚠️ Apple Developer ID Application cert required | ⏳ Post-build | Turnkey GitHub Actions CI workflow ready |
-| **Web / Backend** | ✅ Clean TypeScript; Next.js 15 App Router | ✅ Production build exportable | ✅ Next.js Production Build | ⚠️ SSL Managed by Edge Reverse Proxy | ✅ Web sessions verified | Production deployment ready at `https://oms.finixhr.com` |
+| Platform | Source Checks | Bundles | Native Builds | Signing | Installation Tests | Functional QA | Distribution Status |
+|---|---|---|---|---|---|---|---|
+| **Android (Preview APK)** | ✅ 18/18 Expo Doctor; 0 type errors | ✅ Hermes HBC (`3.27 MB`, 1,165 modules) | ⚠️ Cloud Gated (Gradle verified; requires `ANDROID_HOME` or EAS Cloud) | ⚠️ Debug Keystore (EAS default) | ⏳ Awaiting EAS APK download link | ⏳ Post-installation QA (Staging login, GPS, payslips) | Blocked on `EXPO_TOKEN` / `eas login` |
+| **Android (Prod AAB)** | ✅ Package `com.finixhr.app`; `buildType: app-bundle` | ✅ Hermes HBC (`3.27 MB`, 1,165 modules) | ⚠️ Cloud Gated (Requires EAS Cloud or Android SDK) | ⚠️ Release Keystore required | ⏳ Post-build | ⏳ Staging smoke pass | ❌ **Store Ineligible on SDK 52** (Targets API 34; Google Play requires API 35/36) |
+| **iOS (Ad Hoc IPA)** | ✅ Bundle ID `com.finixhr.app`; Info.plist verified | ✅ Hermes HBC (`3.26 MB`, 1,166 modules) | ⚠️ Cloud Gated (Requires EAS iOS or macOS build host) | ⚠️ Ad Hoc Profile with registered device UDIDs | ⏳ Direct install via OTA / Configurator | ⏳ Post-installation QA | Blocked on Apple Developer Team ID & UDID registration |
+| **iOS (TestFlight / Store)** | ✅ Strict origin & permissions configured | ✅ Hermes HBC (`3.26 MB`, 1,166 modules) | ⚠️ Cloud Gated (Requires EAS iOS or macOS build host) | ⚠️ App Store Distribution Certificate & Profile | ⏳ Internal TestFlight distribution | ⏳ Post-installation QA | Blocked on Apple Developer credentials & App Store Connect API Key |
+| **Windows Desktop (.exe / .msi)**| ✅ Rust 1.99.1, Cargo 1.99.1, MSVC 14.44, WebView2 | N/A (Online Hybrid Client) | ✅ **BUILT & VERIFIED**<br>• `Finix HR_1.0.0_x64-setup.exe` (`1.83 MiB`)<br>• `Finix HR_1.0.0_x64_en-US.msi` (`2.78 MiB`)<br>• `finix-hr.exe` (`8.45 MiB`) | ⚠️ **Unsigned** (SmartScreen unknown publisher prompt) | ✅ Launchable Windows binary | ✅ Responding: `True`; Edge WebView2 child processes spawned (PID 10020) | Ready for Authenticode signing & distribution |
+| **macOS Desktop (.dmg / .app)** | ✅ Tauri v2 configured (`frontendDist: https://oms.finixhr.com`) | N/A (Online Hybrid Client) | ⚠️ Host Gated (Requires macOS runner; CI authored in `.github/workflows/desktop-release.yml`) | ⚠️ Apple Developer ID Application cert required | ⏳ Post-build | ⏳ Post-installation QA | Turnkey GitHub Actions CI workflow ready for execution |
+| **Web / Backend** | ✅ Clean TypeScript (`tsc --noEmit` exit code 0) | ✅ Production export verified | ✅ Next.js 16.4.2 Production Build | ⚠️ SSL Managed by Edge Reverse Proxy | ✅ Web sessions verified locally | ✅ Core RPC APIs verified | ⚠️ **BLOCKED** on production PostgreSQL migration & `HRM_MFA_KEY` |
 
 ---
 
-## 2. Windows Desktop (Tauri v2) Build Evidence
+## 2. Inconsistencies Resolved & Corrected Technical Evidence
 
-### 2.1 Environmental Toolchain Configuration
-- **Host OS:** Windows 10.0.26300 x86_64
-- **Rust Toolchain:** `rustc 1.99.1 (58cf8f9c3 2026-10-13)`, `cargo 1.99.1 (5f94df478 2026-08-27)`, `rustup 1.29.2`
-- **C++ Compiler:** Microsoft Visual Studio Build Tools 2022 (MSVC `14.44.35207`, `cl.exe`, `link.exe`)
-- **Windows SDK:** Windows Kits 10 (`10.0.26100.0`, `kernel32.lib`, `ucrt.lib`)
-- **WebView Runtime:** Microsoft Edge WebView2 `156.0.4314.50`
+### 2.1 Next.js Version Correction
+- *Previous Report Statement*: "Next.js 15 App Router".
+- *Factual Verification*: Root `package.json` and lockfile confirm Next.js is **`16.4.2`**, paired with React **`^19.3.0`**.
+- *Status*: Corrected across all documentation.
 
-### 2.2 Build Execution Commands
+### 2.2 Missing Origin Header vs Literal `Origin: "null"`
+- *Previous Report Statement*: "isOriginAllowed returns true for null origins (native bypass)".
+- *Factual Threat-Model Verification*:
+  1. **Missing Origin Header (`!origin`)**: Emitted by native non-browser HTTP clients (React Native on Android/iOS, desktop clients). The server permits missing Origin headers because native operating systems do not enforce browser CORS restrictions. However, the request is **not** unauthenticated: it proceeds to Layer 3 where it requires an explicit `Authorization: Bearer <token>` or a valid CSRF token if an ambient cookie is present.
+  2. **Literal String `Origin: "null"`**: Emitted by web browsers in sandboxed contexts (sandboxed `<iframe>`, `data:` URLs, local `file://` contexts). In `src/hrm-server/security.ts`, `new URL("null")` throws a `TypeError`, causing `isOriginAllowed` to return `false`. The server returns **HTTP 403 (`Cross-origin request blocked`)**.
+- *Status*: Code audited and documentation corrected.
+
+### 2.3 Android Target SDK & Google Play Store Ineligibility
+- *Analysis*: In `mobile/android/build.gradle`, the legacy SDK 52 configuration specifies:
+  ```groovy
+  targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '34')
+  compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '35')
+  ```
+- *Google Play Requirement*: In 2026, Google Play mandates that new submissions and updates target Android 15 (API 35) or Android 16 (API 36).
+- *Finding*: **An SDK 52 AAB is NOT production-ready for Google Play submission** because its default `targetSdkVersion 34` is rejected by Google Play Console. Store eligibility requires upgrading through the incremental roadmap to SDK 58 (which natively targets API 36) or applying an explicit target SDK override.
+
+### 2.4 Build Signing vs Store Submission Credentials
+- *Android Signing (Keystore)*: Required at build time to cryptographically sign the `.apk` or `.aab` (via Gradle or EAS Managed Keystore).
+- *Google Play Service Account JSON Key*: Required **only** during `eas submit` to authenticate with the Google Play Developer Publishing API. It is not involved in compiling or signing the binary.
+- *iOS Signing*: Requires an Apple Distribution Certificate and Provisioning Profile.
+- *App Store Connect API Key / Apple ID*: Required **only** during `eas submit` or Transporter upload to push the signed `.ipa` to App Store Connect.
+
+### 2.5 iOS Ad Hoc vs TestFlight vs App Store Distribution
+- **Ad Hoc Distribution**: Requires registering individual device UDIDs in the Apple Developer Portal (up to 100 per device class). The provisioning profile embeds these UDIDs, and the `.ipa` can only be installed on those specific physical devices.
+- **TestFlight Distribution**: Uses an App Store Distribution profile without UDID registration. Builds are uploaded to App Store Connect and distributed to internal teams or external beta testers via the TestFlight app.
+- **App Store Production**: The validated TestFlight build is submitted directly for App Store Review and released to the public store.
+
+---
+
+## 3. Windows Desktop (Tauri v2) Functional Test Evidence
+
+### 3.1 Build Execution Commands
 ```powershell
-# Set environment path to Rust toolchain and MSVC tools
 $env:PATH = "C:\Users\TRADECAP\.cargo\bin;$env:PATH"
 Set-Location "c:\Program Files (x86)\MSBuild\OMS\desktop"
-
-# 1. Typecheck & dependency audit
-npx tauri info
-
-# 2. Release build and packaging
 npm run build
 ```
 
-### 2.3 Verified Output Artifacts
-| Artifact Name | Exact Relative Path | File Size | Build Timestamp |
+### 3.2 Verified Output Artifacts
+| Artifact Name | Exact File Path | File Size | Build Timestamp |
 |---|---|---|---|
 | **Windows NSIS Setup Executable** | `desktop/src-tauri/target/release/bundle/nsis/Finix HR_1.0.0_x64-setup.exe` | **1,923,157 bytes (1.83 MiB)** | 2026-10-29 11:57:34 |
 | **Windows WiX MSI Installer** | `desktop/src-tauri/target/release/bundle/msi/Finix HR_1.0.0_x64_en-US.msi` | **2,912,256 bytes (2.78 MiB)** | 2026-10-29 11:57:25 |
 | **Windows Standalone Executable** | `desktop/src-tauri/target/release/finix-hr.exe` | **8,867,840 bytes (8.45 MiB)** | 2026-10-29 11:55:59 |
 
----
-
-## 3. Mobile (Expo) Validation & Artifacts
-
-### 3.1 Commands Executed
-```powershell
-Set-Location "c:\Program Files (x86)\MSBuild\OMS\mobile"
-
-# 1. Dependency validation
-npx expo-doctor
-
-# 2. TypeScript compilation
-npm run typecheck
-
-# 3. Hermes Production Bytecode compilation
-npx expo export --platform android
-npx expo export --platform ios
-
-# 4. Native continuous generation (CNG)
-npx expo prebuild --platform android --clean --no-install
-```
-
-### 3.2 Output Verification
-- **Expo Doctor Check:** 18/18 checks passed (`0 errors`, `0 warnings`).
-- **Android Hermes Bundle:** `mobile/dist/_expo/static/js/android/entry-c52c86360169a1b2ac46aab9a680d4c8.hbc` (`3.27 MB`, 1,165 modules).
-- **iOS Hermes Bundle:** `mobile/dist/_expo/static/js/ios/entry-416675b36ddff708ca4236653de40629.hbc` (`3.26 MB`, 1,166 modules).
-- **Native Android Project:** Generated in `mobile/android/` with Gradle 8.8 wrapper.
+### 3.3 Functional Runtime Verification
+- Executed `desktop/src-tauri/target/release/finix-hr.exe` via PowerShell process automation.
+- **Process Status**: Responsive (`Responding: True`), PID `10020`, Memory Working Set `37.1 MB`.
+- **WebView2 Integration**: Successfully initialized Microsoft Edge WebView2 runtime (`156.0.4314.50`) and spawned WebView2 rendering/GPU child processes (`msedgewebview2.exe`).
+- **MSI Database Verification**: Opened and queried `Finix HR_1.0.0_x64_en-US.msi` via the Windows Installer COM API (`WindowsInstaller.Installer`):
+  - `ProductName`: `Finix HR`
+  - `ProductVersion`: `1.0.0`
+  - `Manufacturer`: `finixhr`
+  - `ProductCode`: `{AF5E5D8E-81B7-4A7A-8BDA-A35D544E724F}`
+  - `UpgradeCode`: `{6BF7A6CB-DCFC-5831-8291-6D00F42E3B10}`
+- **Signing Status**: **Unsigned**. Windows SmartScreen displays an "Unknown Publisher" warning until an Authenticode certificate is applied.
 
 ---
 
-## 4. Security Perimeter & Threat-Model Audit
+## 4. Mobile (Expo & Gradle) Build Evidence
 
-### 4.1 Bearer vs Ambient Cookie Authentication & CSRF
-- **Priority Resolution:** In `src/app/api/hrm/route.ts`, if `Authorization: Bearer <token>` is presented, it takes explicit precedence over any ambient cookie.
-- **CSRF Token Enforcement:** When requests authenticate using an ambient cookie (`cookieToken`), the CSRF token in `X-CSRF-Token` is strictly mandatory unless carrying a capability token or primary password credential.
-- **CSRF Exemption Threat Model:** Custom `Authorization: Bearer` headers cannot be sent cross-site by an attacker without a CORS preflight, which `/api/hrm` does not grant. Furthermore, a foreign domain cannot read local app memory or `SecureStore`.
+### 4.1 Installed Dependency Baseline (Lockfile Verification)
+- `expo`: `52.0.49`
+- `react`: `18.3.1`
+- `react-native`: `0.76.9`
+- `expo-router`: `4.0.22`
+- `react-native-screens`: `4.4.0`
+- `react-native-webview`: `13.12.5`
+- `expo-location`: `18.0.10`
+- `expo-notifications`: `0.29.14`
+- `expo-file-system`: `18.0.12`
+- `expo-sharing`: `13.0.1`
+- `expo-secure-store`: `14.0.1`
 
-### 4.2 Origin & Null-Origin Request Threat Model
-- Browsers sending `Origin: null` (from sandboxed iframes, `data:` URIs, or `file://` schemes) fail host parsing and are rejected with `Cross-origin request blocked (403)`.
-- Non-browser native mobile clients (which emit no `Origin` header) must present a valid Bearer token; missing tokens result in `401 Unauthorized`.
+### 4.2 Hermes Production Bytecode Compilation
+- **Android Bundle**: `mobile/dist/_expo/static/js/android/entry-c52c86360169a1b2ac46aab9a680d4c8.hbc` (**3.27 MB**, 1,165 modules, exit code 0).
+- **iOS Bundle**: `mobile/dist/_expo/static/js/ios/entry-416675b36ddff708ca4236653de40629.hbc` (**3.26 MB**, 1,166 modules, exit code 0).
 
-### 4.3 WebView Scheme and Origin Shielding
-- In `mobile/app/(modules)/[module].tsx`, `isTrustedUrl` strictly checks both scheme (`https:` or development `http:`) and exact host origin.
-- External links, `javascript:` pseudoprotocols, and untrusted schemes are intercepted via `onShouldStartLoadWithRequest` and dispatched to `Linking.openURL`, shielding the user's Bearer token from exposure.
+### 4.3 Native Gradle & JDK 17 Validation
+- Installed Microsoft OpenJDK 17 (`17.0.21.0.2 LTS`) at `C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot`.
+- Verified Gradle wrapper: `Gradle 8.10.2` runs successfully on JVM 17.
+- Executed `mobile/android/gradlew.bat tasks`:
+  - Compiled React Native Gradle plugins (`settings-plugin`, `shared`, `react-native-gradle-plugin`).
+  - Identified local environment blocker: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file`.
+  - Local APK compilation requires installing Android SDK command-line tools or delegating to EAS Cloud.
 
-### 4.4 Tauri Remote-Origin Capabilities
-- Remote frontend (`https://oms.finixhr.com`) is isolated inside the OS WebView with zero ambient permissions.
-- Only safe explicit commands (`app_version`) and the opener plugin (`tauri-plugin-opener`) are exposed. File system, shell, and native subprocess execution remain completely disabled.
+### 4.4 EAS Build Authentication Diagnostic
+- Executed `npx eas-cli build --platform android --profile preview --non-interactive`:
+  - Output: `An Expo user account is required to proceed. Either log in with eas login or set the EXPO_TOKEN environment variable`.
+  - Confirms cloud builds require user account credentials.
 
 ---
 
-## 5. Outstanding Release Blockers & Prerequisites
+## 5. Security Perimeter & Protocol Audits
 
-| Blocker Category | Specific Requirement | Affected Platform | Resolution Path |
-|---|---|---|---|
-| **EAS Account Credentials** | Expo account login (`EXPO_TOKEN` or `npx eas login`) | Android (APK/AAB), iOS (IPA) | Set `EXPO_TOKEN` in GitHub Secrets or run `npx eas login` in terminal. |
-| **Apple Developer Program** | Apple Team ID, Distribution Cert, Provisioning Profile | iOS (IPA / TestFlight), macOS (Notarization) | Connect Apple ID to EAS (`eas credentials`) and Apple Developer portal. |
-| **Google Play Console** | Service Account JSON API Key (`../path/to/api-key.json`) | Android (Production AAB submit) | Generate Google Play API Service Account key in Google Cloud Console. |
-| **Windows Authenticode** | Code signing certificate (EV or Standard) | Windows (`.exe`, `.msi`) | Sign with `signtool.exe` or Azure Trusted Signing to eliminate SmartScreen warning. |
-| **macOS Build Host** | macOS / Xcode environment | macOS (`.dmg`, `.app`) | Run `.github/workflows/desktop-release.yml` on GitHub Actions `macos-latest`. |
-| **Production Database** | Production PostgreSQL connection string in `.env` | Backend API (`/api/hrm`) | Run `bunx prisma migrate deploy` on production database cluster. |
+1. **Bearer vs Ambient Cookie CSRF Boundary**:
+   - In `src/app/api/hrm/route.ts`: `Authorization: Bearer <token>` takes precedence over ambient cookies for non-browser clients.
+   - When requests authenticate using an ambient cookie (`cookieToken`), the CSRF token in `X-CSRF-Token` is strictly mandatory. Attackers cannot bypass CSRF by attaching a dummy Bearer header.
+2. **WebView URL Scheme Shielding**:
+   - In `mobile/app/(modules)/[module].tsx`, `isTrustedUrl` strictly checks both scheme (`https:` or development `http:`) and exact origin.
+   - Non-matching domains, `javascript:` pseudoprotocols, and untrusted schemes are intercepted via `onShouldStartLoadWithRequest` and dispatched to `Linking.openURL`, shielding the user's Bearer token from exposure.
+3. **Tauri Remote-Origin Capabilities**:
+   - Remote webview (`https://oms.finixhr.com`) is isolated inside the OS WebView with zero ambient permissions.
+   - Only `app_version` and `tauri-plugin-opener` are exposed. Local filesystem, process execution, and system shell commands remain disabled.
+4. **Background Location Permissions**:
+   - In `mobile/src/lib/location.ts`: requests foreground location first, followed by background location.
+   - Uses an Android foreground service with a persistent notification (`showsBackgroundLocationIndicator: true`), fully complying with Android 14/15 power-saving and background execution policies.
 
 ---
 
 ## 6. Prioritized Remediation Roadmap
 
-1. **P0 (Immediate)**: Acquire/set `EXPO_TOKEN` secret to trigger `npx eas build -p android --profile preview` to generate the physical `.apk`.
-2. **P0 (Immediate)**: Connect Git remote to GitHub repository and trigger `.github/workflows/desktop-release.yml` for automated macOS `.dmg` and Windows CI artifacts.
-3. **P1 (Pre-Launch)**: Obtain Windows Authenticode certificate and sign `Finix HR_1.0.0_x64-setup.exe` and `Finix HR_1.0.0_x64_en-US.msi`.
-4. **P1 (Pre-Launch)**: Connect Apple Developer Program credentials to EAS to generate the iOS internal ad-hoc `.ipa` for TestFlight.
-5. **P2 (Post-Launch Maintenance)**: Follow [`docs/SDK-UPGRADE-ROADMAP.md`](file:///c:/Program%20Files%20(x86)/MSBuild/OMS/docs/SDK-UPGRADE-ROADMAP.md) to migrate incrementally from SDK 52 through SDK 53, 54, 55, 56, 57, and 58.
+1. **P0 (Immediate Cloud Build Dispatch)**:
+   - Provide `EXPO_TOKEN` secret to trigger `npx eas build --platform android --profile preview` to generate the installable Android preview APK.
+   - Provide `EXPO_TOKEN` and Apple Developer credentials to trigger `npx eas build --platform ios --profile preview` to compile the iOS Ad Hoc IPA.
+2. **P0 (GitHub CI Dispatch)**:
+   - Push repository to GitHub to run `.github/workflows/desktop-release.yml` across `windows-latest`, `macos-latest` (Apple Silicon `aarch64-apple-darwin`), and `macos-13` (Intel `x86_64-apple-darwin`).
+3. **P1 (Code Signing & Store Eligibility)**:
+   - Obtain an Authenticode certificate and sign `Finix HR_1.0.0_x64-setup.exe` and `Finix HR_1.0.0_x64_en-US.msi`.
+   - Prepare migration to Expo SDK 58 per `docs/SDK-UPGRADE-ROADMAP.md` to ensure `targetSdkVersion 36` compatibility for Google Play submission.
+4. **P1 (Production Database & Secrets)**:
+   - Deploy production PostgreSQL cluster and run `bunx prisma migrate deploy`.
+   - Generate production `HRM_MFA_KEY` (`openssl rand -hex 32`) in `.env`.
