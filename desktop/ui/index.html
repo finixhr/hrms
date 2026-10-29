@@ -23,7 +23,7 @@
     </div>
 
     <div class="header-right">
-      <button class="header-btn" id="btnRefresh" title="Reload Workspace">
+      <button class="header-btn" id="btnRefresh" title="Check Connection">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
         </svg>
@@ -37,12 +37,8 @@
     </div>
   </header>
 
-  <!-- Main Viewport -->
+  <!-- Main Viewport (Connection & Launch Hub) -->
   <main class="app-main">
-    <!-- Active Workspace Iframe (Visible when connected) -->
-    <iframe id="workspaceFrame" class="workspace-frame" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
-
-    <!-- Native Connection Hub (Visible when offline or connecting) -->
     <div id="connectionHub" class="connection-hub">
       <div class="hub-card">
         <div class="hub-icon-wrap">
@@ -51,26 +47,34 @@
         </div>
 
         <h1 class="hub-title">Finix HR Desktop Workspace</h1>
-        <p class="hub-subtitle" id="hubSubtitle">Checking connectivity to HRM server...</p>
+        <p class="hub-subtitle" id="hubSubtitle">Verifying connection to HRM server...</p>
 
         <div class="diagnostic-box" id="diagnosticBox">
           <div class="diagnostic-row">
             <span class="diag-label">Target Server:</span>
-            <span class="diag-value" id="diagUrl">https://finixhrm.com</span>
+            <span class="diag-value" id="diagUrl">http://localhost:4055</span>
           </div>
           <div class="diagnostic-row">
-            <span class="diag-label">Connection Status:</span>
-            <span class="diag-value diag-error" id="diagStatus">Checking host...</span>
+            <span class="diag-label">Status:</span>
+            <span class="diag-value" id="diagStatus">Checking host reachability...</span>
           </div>
         </div>
 
         <div class="hub-actions">
+          <button class="btn btn-primary" id="btnLaunch" style="display: none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span>Open Workspace Now</span>
+          </button>
+
           <button class="btn btn-primary" id="btnRetry">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
             </svg>
             <span>Retry Connection</span>
           </button>
+
           <button class="btn btn-secondary" id="btnSwitchLocal">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
@@ -84,7 +88,7 @@
 
         <div class="hub-footer">
           <p class="hub-hint">
-            <strong>Self-Hosting or On-Premise?</strong> You can connect this desktop client to your local server, office LAN IP, or cloud domain in <a href="#" id="linkOpenSettings">Server Settings</a>.
+            <strong>Self-Hosting or Corporate Network?</strong> Connect this desktop client to your local server, office LAN IP, or cloud domain in <a href="#" id="linkOpenSettings">Server Settings</a>.
           </p>
         </div>
       </div>
@@ -106,9 +110,10 @@
         <div class="presets-section">
           <span class="presets-title">Quick Presets:</span>
           <div class="preset-buttons">
-            <button class="preset-pill" data-url="http://localhost:4055">Local Server (localhost:4055)</button>
-            <button class="preset-pill" data-url="https://finixhrm.com">Cloud Production (finixhrm.com)</button>
-            <button class="preset-pill" data-url="https://oms.finixhr.com">Finix Staging (oms.finixhr.com)</button>
+            <button class="preset-pill" data-url="http://localhost:4055">Local Server (http://localhost:4055)</button>
+            <button class="preset-pill" data-url="http://127.0.0.1:4055">Local IP (http://127.0.0.1:4055)</button>
+            <button class="preset-pill" data-url="https://finixhrm.com">Cloud Production (https://finixhrm.com)</button>
+            <button class="preset-pill" data-url="https://oms.finixhr.com">Finix Staging (https://oms.finixhr.com)</button>
           </div>
         </div>
 

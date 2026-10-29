@@ -2,16 +2,14 @@
 (function () {
   const STORAGE_KEY = "finix_desktop_server_url";
   const DEFAULT_LOCAL = "http://localhost:4055";
-  const DEFAULT_PROD = "https://finixhrm.com";
 
   // Elements
   const statusPill = document.getElementById("statusPill");
   const statusText = document.getElementById("statusText");
-  const workspaceFrame = document.getElementById("workspaceFrame");
-  const connectionHub = document.getElementById("connectionHub");
   const hubSubtitle = document.getElementById("hubSubtitle");
   const diagUrl = document.getElementById("diagUrl");
   const diagStatus = document.getElementById("diagStatus");
+  const btnLaunch = document.getElementById("btnLaunch");
   const btnRetry = document.getElementById("btnRetry");
   const btnSwitchLocal = document.getElementById("btnSwitchLocal");
   const btnRefresh = document.getElementById("btnRefresh");
@@ -27,10 +25,7 @@
 
   // Prevent right-click context menu (eliminate browser feel)
   window.addEventListener("contextmenu", (e) => {
-    // Only prevent on UI elements; allow inside workspace if needed
-    if (!e.target.closest("iframe")) {
-      e.preventDefault();
-    }
+    e.preventDefault();
   });
 
   // Fetch Tauri app version if available
@@ -44,7 +39,6 @@
   function getServerUrl() {
     let url = localStorage.getItem(STORAGE_KEY);
     if (!url) {
-      // Default to localhost if dev, or prod
       url = DEFAULT_LOCAL;
       localStorage.setItem(STORAGE_KEY, url);
     }
@@ -64,13 +58,13 @@
   }
 
   // Test server connectivity
-  async function checkServerHealth(url, timeoutMs = 4000) {
+  async function checkServerHealth(url, timeoutMs = 3500) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       // Test the server with a light fetch (mode: no-cors permits basic reachability test)
-      const res = await fetch(url, {
+      await fetch(url, {
         method: "HEAD",
         mode: "no-cors",
         signal: controller.signal,
@@ -90,32 +84,37 @@
     diagUrl.textContent = url;
     inputServerUrl.value = url;
 
-    setStatus("checking", "Connecting to " + new URL(url).hostname);
+    setStatus("checking", "Connecting...");
     hubSubtitle.textContent = "Connecting to Finix HR server at " + url + "...";
     diagStatus.className = "diag-value";
-    diagStatus.textContent = "Checking network reachability...";
+    diagStatus.textContent = "Testing network reachability...";
+
+    btnRetry.style.display = "inline-flex";
+    btnLaunch.style.display = "none";
 
     const health = await checkServerHealth(url);
 
     if (health.ok) {
       setStatus("online", "Connected: " + new URL(url).host);
       diagStatus.className = "diag-value diag-success";
-      diagStatus.textContent = "Connected (Online)";
+      diagStatus.textContent = "Connected (Online). Launching workspace...";
+      hubSubtitle.textContent = "Server is online. Opening Finix HR...";
 
-      // Load into workspace iframe
-      if (workspaceFrame.src !== url && workspaceFrame.src !== url + "/") {
-        workspaceFrame.src = url;
-      }
-      workspaceFrame.classList.add("active");
-      connectionHub.style.display = "none";
+      btnLaunch.style.display = "inline-flex";
+      btnLaunch.onclick = () => {
+        window.location.replace(url);
+      };
+
+      // Top-level navigation directly replaces the window location
+      // This completely eliminates iframe X-Frame-Options blocking & camera permission issues
+      setTimeout(() => {
+        window.location.replace(url);
+      }, 350);
     } else {
       setStatus("offline", "Server Unreachable");
       diagStatus.className = "diag-value diag-error";
-      diagStatus.textContent = health.error || "Server IP not found (ERR_NAME_NOT_RESOLVED)";
-      hubSubtitle.textContent = "Unable to establish a connection with the Finix HR server.";
-
-      workspaceFrame.classList.remove("active");
-      connectionHub.style.display = "flex";
+      diagStatus.textContent = health.error || "Cannot establish connection (Server offline or DNS unconfigured)";
+      hubSubtitle.textContent = "Unable to reach Finix HR server. Make sure your server is running.";
     }
   }
 
@@ -130,16 +129,7 @@
   });
 
   btnRefresh.addEventListener("click", () => {
-    const url = getServerUrl();
-    if (workspaceFrame.classList.contains("active")) {
-      try {
-        workspaceFrame.contentWindow.location.reload();
-      } catch (e) {
-        workspaceFrame.src = url;
-      }
-    } else {
-      connectWorkspace();
-    }
+    connectWorkspace();
   });
 
   // Settings Modal handlers
@@ -183,10 +173,10 @@
       return;
     }
 
-    const res = await checkServerHealth(testTarget, 5000);
+    const res = await checkServerHealth(testTarget, 4000);
     if (res.ok) {
       testResult.className = "test-result success";
-      testResult.textContent = "✓ Success! Server is reachable.";
+      testResult.textContent = "✓ Success! Server is online and responding.";
     } else {
       testResult.className = "test-result error";
       testResult.textContent = "✗ Failed: " + (res.error || "Cannot connect to server");
@@ -214,7 +204,7 @@
   window.addEventListener("keydown", (e) => {
     if (e.key === "F5" || (e.ctrlKey && e.key === "r")) {
       e.preventDefault();
-      btnRefresh.click();
+      connectWorkspace();
     }
     if (e.key === "Escape" && !settingsModal.classList.contains("hidden")) {
       closeSettings();
