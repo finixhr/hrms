@@ -12,13 +12,13 @@
 
 | Platform | Source Checks | Bundles | Native Builds | Signing | Installation Tests | Functional QA | Distribution Status |
 |---|---|---|---|---|---|---|---|
-| **Android (Preview APK)** | ✅ 18/18 Expo Doctor; 0 type errors | ✅ Hermes HBC (`3.27 MB`, 1,165 modules) | ⚠️ Cloud Gated (Gradle verified; requires `ANDROID_HOME` or EAS Cloud) | ⚠️ Debug Keystore (EAS default) | ⏳ Awaiting EAS APK download link | ⏳ Post-installation QA (Staging login, GPS, payslips) | Blocked on `EXPO_TOKEN` / `eas login` |
-| **Android (Prod AAB)** | ✅ Package `com.finixhr.app`; `buildType: app-bundle` | ✅ Hermes HBC (`3.27 MB`, 1,165 modules) | ⚠️ Cloud Gated (Requires EAS Cloud or Android SDK) | ⚠️ Release Keystore required | ⏳ Post-build | ⏳ Staging smoke pass | ❌ **Store Ineligible on SDK 52** (Targets API 34; Google Play requires API 35/36) |
-| **iOS (Ad Hoc IPA)** | ✅ Bundle ID `com.finixhr.app`; Info.plist verified | ✅ Hermes HBC (`3.26 MB`, 1,166 modules) | ⚠️ Cloud Gated (Requires EAS iOS or macOS build host) | ⚠️ Ad Hoc Profile with registered device UDIDs | ⏳ Direct install via OTA / Configurator | ⏳ Post-installation QA | Blocked on Apple Developer Team ID & UDID registration |
-| **iOS (TestFlight / Store)** | ✅ Strict origin & permissions configured | ✅ Hermes HBC (`3.26 MB`, 1,166 modules) | ⚠️ Cloud Gated (Requires EAS iOS or macOS build host) | ⚠️ App Store Distribution Certificate & Profile | ⏳ Internal TestFlight distribution | ⏳ Post-installation QA | Blocked on Apple Developer credentials & App Store Connect API Key |
-| **Windows Desktop (.exe / .msi)**| ✅ Rust 1.99.1, Cargo 1.99.1, MSVC 14.44, WebView2 | N/A (Online Hybrid Client) | ✅ **BUILT & VERIFIED**<br>• `Finix HR_1.0.0_x64-setup.exe` (`1.83 MiB`)<br>• `Finix HR_1.0.0_x64_en-US.msi` (`2.78 MiB`)<br>• `finix-hr.exe` (`8.45 MiB`) | ⚠️ **Unsigned** (SmartScreen unknown publisher prompt) | ✅ Launchable Windows binary | ✅ Responding: `True`; Edge WebView2 child processes spawned (PID 10020) | Ready for Authenticode signing & distribution |
+| **Android (Preview APK)** | ✅ 18/18 Expo Doctor; 0 type errors | ✅ Hermes HBC (`3.27 MB`, `entry-9a0a05f...`) | ⚠️ Cloud Gated (Gradle verified; requires `ANDROID_HOME` or EAS Cloud) | ⚠️ Debug Keystore (EAS default) | ⏳ Awaiting EAS APK download link | ⏳ Post-installation QA (Staging login, GPS, payslips) | Blocked on `EXPO_TOKEN` / `eas login` |
+| **Android (Prod AAB)** | ✅ Package `com.finixhr.app`; `buildType: app-bundle` | ✅ Hermes HBC (`3.27 MB`, `entry-9a0a05f...`) | ⚠️ Cloud Gated (Requires EAS Cloud or Android SDK) | ⚠️ Release Keystore required | ⏳ Post-build | ⏳ Staging smoke pass | ❌ **Store Ineligible on SDK 52** (Targets API 34; Google Play requires API 35/36) |
+| **iOS (Ad Hoc IPA)** | ✅ Bundle ID `com.finixhr.app`; Info.plist verified | ✅ Hermes HBC (`3.26 MB`, `entry-e8247d2...`) | ⚠️ Cloud Gated (Requires EAS iOS or macOS build host) | ⚠️ Ad Hoc Profile with registered device UDIDs | ⏳ Direct install via OTA / Configurator | ⏳ Post-installation QA | Blocked on Apple Developer Team ID & UDID registration |
+| **iOS (TestFlight / Store)** | ✅ Strict origin & permissions configured | ✅ Hermes HBC (`3.26 MB`, `entry-e8247d2...`) | ⚠️ Cloud Gated (Requires EAS iOS or macOS build host) | ⚠️ App Store Distribution Certificate & Profile | ⏳ Internal TestFlight distribution | ⏳ Post-installation QA | Blocked on Apple Developer credentials & App Store Connect API Key |
+| **Windows Desktop (.exe / .msi)**| ✅ Rust 1.99.1, Cargo 1.99.1, MSVC 14.44, WebView2 | N/A (Online Hybrid Client) | ✅ **BUILT & VERIFIED**<br>• `Finix HR_1.0.0_x64-setup.exe` (`1.83 MiB`)<br>• `Finix HR_1.0.0_x64_en-US.msi` (`2.78 MiB`)<br>• `finix-hr.exe` (`8.45 MiB`) | ⚠️ **Unsigned** (SmartScreen unknown publisher prompt) | ✅ Launchable Windows binary | ⚠️ **Startup Verified** (Responsive: `True`, PID 10020, WebView2 spawned; full E2E workflows pending live server pass) | Ready for Authenticode signing & staging distribution |
 | **macOS Desktop (.dmg / .app)** | ✅ Tauri v2 configured (`frontendDist: https://oms.finixhr.com`) | N/A (Online Hybrid Client) | ⚠️ Host Gated (Requires macOS runner; CI authored in `.github/workflows/desktop-release.yml`) | ⚠️ Apple Developer ID Application cert required | ⏳ Post-build | ⏳ Post-installation QA | Turnkey GitHub Actions CI workflow ready for execution |
-| **Web / Backend** | ✅ Clean TypeScript (`tsc --noEmit` exit code 0) | ✅ Production export verified | ✅ Next.js 16.4.2 Production Build | ⚠️ SSL Managed by Edge Reverse Proxy | ✅ Web sessions verified locally | ✅ Core RPC APIs verified | ⚠️ **BLOCKED** on production PostgreSQL migration & `HRM_MFA_KEY` |
+| **Web / Backend** | ✅ Clean TypeScript (`tsc --noEmit` exit code 0) | ✅ Production export verified | ✅ Next.js 16.4.2 Production Build | ⚠️ SSL Managed by Edge Reverse Proxy | ✅ Web sessions verified locally | ✅ Core RPC APIs verified | ⚠️ **BLOCKED** on production PostgreSQL migration (`bunx prisma migrate deploy`) & `HRM_MFA_KEY` |
 
 ---
 
@@ -74,7 +74,10 @@ npm run build
 | **Windows WiX MSI Installer** | `desktop/src-tauri/target/release/bundle/msi/Finix HR_1.0.0_x64_en-US.msi` | **2,912,256 bytes (2.78 MiB)** | 2026-10-29 11:57:25 |
 | **Windows Standalone Executable** | `desktop/src-tauri/target/release/finix-hr.exe` | **8,867,840 bytes (8.45 MiB)** | 2026-10-29 11:55:59 |
 
-### 3.3 Functional Runtime Verification
+### 3.3 Functional Runtime Verification & QA Status: Startup Verified
+- **QA Rating**: **Startup Verified** (not Full QA Pass).
+  - *Verified Criteria*: Executable launches cleanly, maintains responsive message loop, memory footprint stable at `37.1 MB`, Microsoft Edge WebView2 runtime (`156.0.4314.50`) successfully initializes, rendering and GPU child processes (`msedgewebview2.exe`) spawn and terminate cleanly.
+  - *Pending End-to-End Verification*: Interactive user flows inside the webview (submitting login credentials, MFA code entry, attendance geofence punch, payslip generation, and leave approval) must be verified against a live, reachable staging server before upgrading QA status to Full QA Pass.
 - Executed `desktop/src-tauri/target/release/finix-hr.exe` via PowerShell process automation.
 - **Process Status**: Responsive (`Responding: True`), PID `10020`, Memory Working Set `37.1 MB`.
 - **WebView2 Integration**: Successfully initialized Microsoft Edge WebView2 runtime (`156.0.4314.50`) and spawned WebView2 rendering/GPU child processes (`msedgewebview2.exe`).
@@ -104,8 +107,8 @@ npm run build
 - `expo-secure-store`: `14.0.1`
 
 ### 4.2 Hermes Production Bytecode Compilation
-- **Android Bundle**: `mobile/dist/_expo/static/js/android/entry-c52c86360169a1b2ac46aab9a680d4c8.hbc` (**3.27 MB**, 1,165 modules, exit code 0).
-- **iOS Bundle**: `mobile/dist/_expo/static/js/ios/entry-416675b36ddff708ca4236653de40629.hbc` (**3.26 MB**, 1,166 modules, exit code 0).
+- **Android Bundle**: `mobile/dist/android/_expo/static/js/android/entry-9a0a05f05316fcc3171e78c88f380ff8.hbc` (**3,269,048 bytes / 3.27 MB**, 1,165 modules, exit code 0).
+- **iOS Bundle**: `mobile/dist/ios/_expo/static/js/ios/entry-e8247d2113997b835ebd12585501cf17.hbc` (**3,264,300 bytes / 3.26 MB**, 1,166 modules, exit code 0).
 
 ### 4.3 Native Gradle & JDK 17 Validation
 - Installed Microsoft OpenJDK 17 (`17.0.21.0.2 LTS`) at `C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot`.
@@ -115,14 +118,19 @@ npm run build
   - Identified local environment blocker: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file`.
   - Local APK compilation requires installing Android SDK command-line tools or delegating to EAS Cloud.
 
-### 4.4 EAS Build Authentication Diagnostic
+### 4.4 EAS Build Authentication & Signing Verification
 - Executed `npx eas-cli build --platform android --profile preview --non-interactive`:
   - Output: `An Expo user account is required to proceed. Either log in with eas login or set the EXPO_TOKEN environment variable`.
   - Confirms cloud builds require user account credentials.
+- **Signing Architecture**:
+  - *Android Preview APK*: Signed with EAS managed debug/adhoc Keystore; direct installation on test devices without store policy restrictions.
+  - *Android Production AAB*: Signed with release Keystore; Google Play App Signing re-signs split APKs upon store distribution.
+  - *iOS Ad Hoc IPA*: Signed with Apple Distribution Certificate & Ad Hoc Provisioning Profile containing physical test device UDIDs.
+  - *iOS TestFlight / Store IPA*: Signed with Apple Distribution Certificate & App Store Provisioning Profile; submitted via App Store Connect API.
 
 ---
 
-## 5. Security Perimeter & Protocol Audits
+## 5. Security Perimeter & Push Notification Audits
 
 1. **Bearer vs Ambient Cookie CSRF Boundary**:
    - In `src/app/api/hrm/route.ts`: `Authorization: Bearer <token>` takes precedence over ambient cookies for non-browser clients.
@@ -130,10 +138,14 @@ npm run build
 2. **WebView URL Scheme Shielding**:
    - In `mobile/app/(modules)/[module].tsx`, `isTrustedUrl` strictly checks both scheme (`https:` or development `http:`) and exact origin.
    - Non-matching domains, `javascript:` pseudoprotocols, and untrusted schemes are intercepted via `onShouldStartLoadWithRequest` and dispatched to `Linking.openURL`, shielding the user's Bearer token from exposure.
-3. **Tauri Remote-Origin Capabilities**:
+3. **Tauri Remote-Origin Capabilities & Sandbox**:
    - Remote webview (`https://oms.finixhr.com`) is isolated inside the OS WebView with zero ambient permissions.
    - Only `app_version` and `tauri-plugin-opener` are exposed. Local filesystem, process execution, and system shell commands remain disabled.
-4. **Background Location Permissions**:
+4. **Push Notification Infrastructure (Expo Push + FCM + APNs)**:
+   - Server route `sendMobilePushToUser` in `src/hrm-server/push/mobile-push.ts` queries `DeviceToken` table and delivers via `https://exp.host/--/api/v2/push/send`.
+   - Expo servers forward to Google FCM (Android) via Firebase Service Account JSON (FCM v1 API) and Apple APNs (iOS) via `.p8` auth key.
+   - Automatic stale token cleanup: tokens returned with `DeviceNotRegistered` are immediately deleted from `db.deviceToken`.
+5. **Background Location Permissions**:
    - In `mobile/src/lib/location.ts`: requests foreground location first, followed by background location.
    - Uses an Android foreground service with a persistent notification (`showsBackgroundLocationIndicator: true`), fully complying with Android 14/15 power-saving and background execution policies.
 
@@ -141,14 +153,17 @@ npm run build
 
 ## 6. Prioritized Remediation Roadmap
 
-1. **P0 (Immediate Cloud Build Dispatch)**:
-   - Provide `EXPO_TOKEN` secret to trigger `npx eas build --platform android --profile preview` to generate the installable Android preview APK.
-   - Provide `EXPO_TOKEN` and Apple Developer credentials to trigger `npx eas build --platform ios --profile preview` to compile the iOS Ad Hoc IPA.
-2. **P0 (GitHub CI Dispatch)**:
-   - Push repository to GitHub to run `.github/workflows/desktop-release.yml` across `windows-latest`, `macos-latest` (Apple Silicon `aarch64-apple-darwin`), and `macos-13` (Intel `x86_64-apple-darwin`).
-3. **P1 (Code Signing & Store Eligibility)**:
-   - Obtain an Authenticode certificate and sign `Finix HR_1.0.0_x64-setup.exe` and `Finix HR_1.0.0_x64_en-US.msi`.
-   - Prepare migration to Expo SDK 58 per `docs/SDK-UPGRADE-ROADMAP.md` to ensure `targetSdkVersion 36` compatibility for Google Play submission.
-4. **P1 (Production Database & Secrets)**:
-   - Deploy production PostgreSQL cluster and run `bunx prisma migrate deploy`.
-   - Generate production `HRM_MFA_KEY` (`openssl rand -hex 32`) in `.env`.
+1. **P0 (Production Database Deployment & MFA Secret)**:
+   - Run pre-migration backup: `bash scripts/backup.sh`.
+   - Execute production PostgreSQL migration: `bunx prisma migrate deploy` (ensures zero data-loss, applies `DeviceToken` and all schema updates).
+   - Generate production 64-character hex key: `openssl rand -hex 32` and set `HRM_MFA_KEY` in production `.env`.
+   - Verify boot guard passes via `src/instrumentation.ts`.
+2. **P0 (EAS Cloud Build Dispatch)**:
+   - Provide `EXPO_TOKEN` secret to execute `npx eas build --platform android --profile preview` to compile the installable preview APK.
+   - Configure Firebase Service Account JSON (FCM v1) in EAS Credentials to enable Android push delivery.
+   - Configure Apple Developer Account and APNs `.p8` key in EAS to compile iOS Ad Hoc and TestFlight IPAs.
+3. **P1 (Code Signing & Store Submission Eligibility)**:
+   - Obtain an Authenticode code-signing certificate for Windows installer (`Finix HR_1.0.0_x64-setup.exe` and `Finix HR_1.0.0_x64_en-US.msi`) to eliminate SmartScreen unknown publisher prompts.
+   - Resolve Android Google Play API 35/36 submission requirement: execute sequential SDK migration to SDK 58 per `docs/SDK-UPGRADE-ROADMAP.md` (or configure temporary `android.targetSdkVersion=35` override in `gradle.properties`).
+4. **P1 (GitHub CI macOS & Windows Release)**:
+   - Push repository to GitHub to run `.github/workflows/desktop-release.yml` across `windows-latest`, `macos-latest` (Apple Silicon `aarch64`), and `macos-13` (Intel `x86_64`) with Apple Developer ID signing.

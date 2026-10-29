@@ -90,11 +90,64 @@ flowchart LR
    npx expo export --platform android
    npx expo export --platform ios
    ```
-7. **Regenerate Native Projects**:
-   ```bash
-   npx expo prebuild --clean --no-install
+---
+
+## 4. Empirical Upgrade Testing & Resolution Findings
+
+### 4.1 Upstream Peer Conflict at SDK 53 Boundary (ERESOLVE)
+
+During empirical testing on branch `feature/expo-sdk-58-migration`, running `npx expo install --fix` for SDK 53 surfaced an upstream npm resolution conflict:
+
+```
+npm error ERESOLVE could not resolve
+npm error Conflicting peer dependency: react@19.0.0
+npm error   peer react@"^19.2.9" from react-server-dom-webpack@19.2.9
+npm error     peerOptional react-server-dom-webpack@"~19.0.4 || ~19.1.5 || ~19.2.4" from expo-router@5.1.11
+```
+
+**Root Cause Analysis:**  
+In late 2026, the npm registry resolves optional sub-dependency `react-server-dom-webpack` to its latest patch `19.2.9`, which strictly declares `peerDependencies: { "react": "^19.2.9" }`. However, Expo SDK 53 strictly expects `react@19.0.0`. Under standard npm 10+ strict peer dependency resolution, this causes `npm install` to abort.
+
+**Remediation Protocol:**  
+To pass the SDK 53 / 54 checkpoints:
+1. In `mobile/package.json`, specify an explicit npm override to pin `react-server-dom-webpack`:
+   ```json
+   "overrides": {
+     "react-server-dom-webpack": "19.0.0"
+   }
    ```
-8. **Commit Checkpoint**:
-   ```bash
-   git commit -m "feat(mobile): complete incremental migration checkpoint to Expo SDK <version>"
+2. Or run the checkpoint installation with `--legacy-peer-deps`:
+   ```powershell
+   npm install --legacy-peer-deps
    ```
+3. Once upgraded to **SDK 55+**, this issue dissolves naturally because SDK 55 upgrades React Core to `19.2.0`, and SDK 58 upgrades to `19.3.0`.
+
+---
+
+## 5. Google Play Store Submission Eligibility (Android API 35/36)
+
+### 5.1 The API 34 Rejection Barrier
+In `mobile/android/build.gradle`, the legacy SDK 52 baseline sets:
+```groovy
+targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '34')
+```
+Because Google Play Console requires all new apps and updates in 2026 to target **Android 15 (API 35)** or **Android 16 (API 36)**, an AAB compiled with default SDK 52 settings will be immediately rejected upon upload.
+
+### 5.2 Two Available Pathways
+1. **Immediate Configuration Override (Short-Term)**:
+   Add `android.targetSdkVersion=35` to `mobile/android/gradle.properties` or configure `targetSdkVersion: 35` in `mobile/app.json`.  
+   *Caveat*: React Native 0.76.9 in SDK 52 was not built for Android 16 edge-to-edge enforcement; window insets and keyboard avoiding views must be thoroughly tested.
+2. **Strategic SDK 58 Migration (Recommended)**:
+   Completing the sequential migration to SDK 58 natively configures `targetSdkVersion 36`, React Native 0.88, React 19.3.0, and modern edge-to-edge layouts, guaranteeing long-term Google Play and Apple App Store compliance.
+
+---
+
+## 6. Baseline Preservation Guarantee
+
+The repository's default branch `main` remains locked to the verified **Expo SDK 52.0.49** baseline:
+- `18/18` Expo Doctor checks passing with 0 warnings.
+- `0` TypeScript compilation errors (`npm run typecheck`).
+- Fully compiled production Hermes bytecode bundles on disk (`mobile/dist/`).
+- Verified Windows desktop release installer binaries on disk (`desktop/src-tauri/target/release/`).
+
+All incremental migration experiments are isolated on dedicated feature branches (`feature/expo-sdk-58-migration`) and must not replace the production baseline until an end-to-end native build succeeds.
