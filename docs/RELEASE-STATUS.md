@@ -113,14 +113,15 @@ npm run build
   - Identified local environment blocker: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file`.
   - Local APK compilation requires installing Android SDK command-line tools or delegating to EAS Cloud.
 
-### 4.4 EAS Build Execution & Cloud Verification
+### 4.4 EAS Build Execution & Completed Preview APK
 - **EAS Project Link**: `@finixhr/finix-hr` (Project ID: `5df89cc1-1316-49e8-ae1d-4ced3b9a69b5`).
-- **Active Android Preview APK Build**:
-  - Command: `npx eas-cli build --platform android --profile preview --non-interactive`
+- **Completed Android Preview APK**:
   - Build ID: `30e4a348-5855-45fb-8384-c81aa55f7633`
+  - EAS Build Status: **Finished**
   - Live Build Console: `https://expo.dev/accounts/finixhr/projects/finix-hr/builds/30e4a348-5855-45fb-8384-c81aa55f7633`
-  - Keystore Status: Automatically generated 4096-bit RSA Keystore in EAS Cloud Vault.
-  - Archive Status: `23.9 MB` bundle successfully uploaded and fingerprint verified.
+  - Cloud Download URL: `https://expo.dev/artifacts/eas/0yzAbbOcdp72s75Ld2uKdukZjcGYbZfhwAisXoYww4Y.apk`
+  - Local Verified Path: `mobile/dist/apk/finix-hr-preview.apk` (**89,872,843 bytes / 85.71 MiB**)
+  - Package Inspection: 1,272 archive entries, verified `AndroidManifest.xml`, `classes.dex`, and Hermes `index.android.bundle`.
 - **Signing Architecture**:
   - *Android Preview APK*: Signed with EAS managed debug/adhoc Keystore; direct installation on test devices without store policy restrictions.
   - *Android Production AAB*: Signed with release Keystore; Google Play App Signing re-signs split APKs upon store distribution.
