@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1091078232793",
+    "project_id": "finix-hr-97374",
+    "storage_bucket": "finix-hr-97374.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1091078232793:android:151957b5ee26db6a8f3cc8",
+        "android_client_info": {
+          "package_name": "com.finixhr.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBn55bTRPJ7jF0IX6ZZNXGjED0Yq4_P7Gk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

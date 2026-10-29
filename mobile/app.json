@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#1e40af"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.finixhr.app",
@@ -28,13 +30,16 @@
         "backgroundColor": "#1e40af"
       },
       "package": "com.finixhr.app",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -64,9 +69,13 @@
     },
     "extra": {
       "apiBaseUrl": "https://oms.finixhr.com",
+      "router": {
+        "origin": false
+      },
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "5df89cc1-1316-49e8-ae1d-4ced3b9a69b5"
       }
-    }
+    },
+    "owner": "finixhr"
   }
 }

@@ -12,7 +12,7 @@
 
 | Platform | Source Checks | Bundles | Native Builds | Signing | Installation Tests | Functional QA | Distribution Status |
 |---|---|---|---|---|---|---|---|
-| **Android (Preview APK)** | ✅ 18/18 Expo Doctor; 0 type errors | ✅ Hermes HBC (`3.27 MB`, `entry-9a0a05f...`) | ⚠️ Cloud Gated (Gradle verified; requires `ANDROID_HOME` or EAS Cloud) | ⚠️ Debug Keystore (EAS default) | ⏳ Awaiting EAS APK download link | ⏳ Post-installation QA (Staging login, GPS, payslips) | Blocked on `EXPO_TOKEN` / `eas login` |
+| **Android (Preview APK)** | ✅ 18/18 Expo Doctor; 0 type errors | ✅ Hermes HBC (`3.27 MB`, `entry-9a0a05f...`) | 🚀 **Build Dispatched / In Progress (EAS Cloud)**<br>Build ID: `30e4a348-5855-45fb-8384-c81aa55f7633` | ✅ Managed Keystore (Generated in Cloud) | ⏳ Build executing on EAS Cloud workers | ⏳ Post-installation QA (Staging login, GPS, payslips) | 🟢 **ACTIVE BUILD IN PROGRESS** |
 | **Android (Prod AAB)** | ✅ Package `com.finixhr.app`; `buildType: app-bundle` | ✅ Hermes HBC (`3.27 MB`, `entry-9a0a05f...`) | ⚠️ Cloud Gated (Requires EAS Cloud or Android SDK) | ⚠️ Release Keystore required | ⏳ Post-build | ⏳ Staging smoke pass | ❌ **Store Ineligible on SDK 52** (Targets API 34; Google Play requires API 35/36) |
 | **iOS (Ad Hoc IPA)** | ✅ Bundle ID `com.finixhr.app`; Info.plist verified | ✅ Hermes HBC (`3.26 MB`, `entry-e8247d2...`) | ⚠️ Cloud Gated (Requires EAS iOS or macOS build host) | ⚠️ Ad Hoc Profile with registered device UDIDs | ⏳ Direct install via OTA / Configurator | ⏳ Post-installation QA | Blocked on Apple Developer Team ID & UDID registration |
 | **iOS (TestFlight / Store)** | ✅ Strict origin & permissions configured | ✅ Hermes HBC (`3.26 MB`, `entry-e8247d2...`) | ⚠️ Cloud Gated (Requires EAS iOS or macOS build host) | ⚠️ App Store Distribution Certificate & Profile | ⏳ Internal TestFlight distribution | ⏳ Post-installation QA | Blocked on Apple Developer credentials & App Store Connect API Key |
@@ -118,10 +118,14 @@ npm run build
   - Identified local environment blocker: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file`.
   - Local APK compilation requires installing Android SDK command-line tools or delegating to EAS Cloud.
 
-### 4.4 EAS Build Authentication & Signing Verification
-- Executed `npx eas-cli build --platform android --profile preview --non-interactive`:
-  - Output: `An Expo user account is required to proceed. Either log in with eas login or set the EXPO_TOKEN environment variable`.
-  - Confirms cloud builds require user account credentials.
+### 4.4 EAS Build Execution & Cloud Verification
+- **EAS Project Link**: `@finixhr/finix-hr` (Project ID: `5df89cc1-1316-49e8-ae1d-4ced3b9a69b5`).
+- **Active Android Preview APK Build**:
+  - Command: `npx eas-cli build --platform android --profile preview --non-interactive`
+  - Build ID: `30e4a348-5855-45fb-8384-c81aa55f7633`
+  - Live Build Console: `https://expo.dev/accounts/finixhr/projects/finix-hr/builds/30e4a348-5855-45fb-8384-c81aa55f7633`
+  - Keystore Status: Automatically generated 4096-bit RSA Keystore in EAS Cloud Vault.
+  - Archive Status: `23.9 MB` bundle successfully uploaded and fingerprint verified.
 - **Signing Architecture**:
   - *Android Preview APK*: Signed with EAS managed debug/adhoc Keystore; direct installation on test devices without store policy restrictions.
   - *Android Production AAB*: Signed with release Keystore; Google Play App Signing re-signs split APKs upon store distribution.
