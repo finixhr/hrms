@@ -71,6 +71,10 @@ export default function ModuleDetailScreen() {
     try {
       const parsedTarget = new URL(targetUrl);
       const parsedBase = new URL(base);
+      // Strictly permit only http/https schemes and require identical origin
+      if (parsedTarget.protocol !== "https:" && parsedTarget.protocol !== "http:") {
+        return false;
+      }
       return parsedTarget.origin === parsedBase.origin;
     } catch {
       return false;

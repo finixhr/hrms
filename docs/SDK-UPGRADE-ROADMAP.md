@@ -1,99 +1,100 @@
-# Finix HR — Expo SDK Incremental Upgrade Roadmap
+# Finix HR — Expo SDK Incremental Migration Roadmap (SDK 52 ➔ SDK 58)
 
-**Document Version:** 1.0.0  
-**Effective Baseline:** Expo SDK 52.0.0 (React 18.3.1, React Native 0.76.9, Hermes)  
-**Target Roadmap:** SDK 52.0.x (Current Stable) ➔ SDK 53.0.x (Canary Staging) ➔ SDK 54.0.x (LTS Production)
-
----
-
-## 1. Executive Summary & Baseline Validation
-
-Finix HR Mobile is currently stabilized on **Expo SDK 52** with exact peer-pinned dependencies.
-
-### Current Baseline Metrics:
-- **Expo SDK:** `52.0.0`
-- **React:** `18.3.1` (Strictly pinned to avoid React 19 breaking peer conflicts)
-- **React Native:** `0.76.9`
-- **Expo Router:** `~4.0.0`
-- **Hermes Android Bundle:** `3.27 MB` (1,165 modules, bytecode compiled)
-- **Hermes iOS Bundle:** `3.26 MB` (1,166 modules, bytecode compiled)
-- **Expo Doctor Status:** 18/18 checks passed (`0 errors`, `0 warnings`)
-- **TypeScript Status:** 0 type errors (`tsc --noEmit` exit code 0)
-
-> [!IMPORTANT]
-> Blindly running `npx expo upgrade` to SDK 53+ on this codebase immediately breaks the runtime due to React 19's breaking refactoring of ref props, `react-native-screens` layout contracts, and WebView bridging changes. The migration must follow the strict three-phase plan below.
+**Document Version:** 2.0.0  
+**Effective Baseline:** Expo SDK 52.0.49 (Legacy Baseline)  
+**Target Architecture:** Expo SDK 58.0.21 (Current Latest Production)  
+**Migration Methodology:** Strict incremental step-by-step validation across SDK 53, 54, 55, 56, 57, and 58.
 
 ---
 
-## 2. Technical Risk Analysis (SDK 52 ➔ SDK 53 / 54)
+## 1. Executive Summary & Version Matrix
 
-| Component / Subsystem | Current Baseline (SDK 52) | Future Baseline (SDK 53/54) | Potential Breaking Changes & Mitigations |
-|---|---|---|---|
-| **React Core** | `18.3.1` | `19.0.0+` | Ref as prop deprecations (`forwardRef`), JSX transform differences. All components in `src/components/ui.tsx` must be audited for standard React 19 element signatures. |
-| **New Architecture** | Optional (`newArchEnabled: false`) | Default (`newArchEnabled: true`) | TurboModules and Fabric renderer become default. Native plugins (`react-native-webview`, `expo-task-manager`) must verify C++ Fabric components. |
-| **Expo Router** | `~4.0.0` | `~5.0.0` | Route group layout changes, type-safe route generation updates, and replacement of `query-string` internal parsers. |
-| **React Native Screens** | `~4.4.0` | `~4.8.0+` | Header transition animations and nested stack header avoidance behavior in Android 15 edge-to-edge layouts. |
-| **Camera & Media** | `expo-camera ~16.0.0` | `expo-camera ~17.0.0` | Deprecation of legacy camera view props; migration to `CameraView` barcode scanner and face detection. |
+SDK 52 represents our existing legacy baseline. Expo has released six subsequent major iterations: SDK 53, SDK 54, SDK 55, SDK 56, SDK 57, and SDK 58. 
+
+The application must not be upgraded in a single leap; instead, migration proceeds sequentially through each version boundary, committing checkpoints and validating type safety, dependency compatibility, Expo Doctor diagnostics, and native bundle compilation at each step.
+
+### Comprehensive Dependency Alignment Matrix
+
+| Subsystem / Package | SDK 52 (Legacy) | SDK 53 | SDK 54 | SDK 55 | SDK 56 | SDK 57 | SDK 58 (Latest) |
+|---|---|---|---|---|---|---|---|
+| **Expo Core** | `52.0.49` | `53.0.27` | `54.0.38` | `55.0.32` | `56.0.24` | `57.0.31` | `58.0.21` |
+| **React Core** | `18.3.1` | `19.0.0` | `19.1.0` | `19.2.0` | `19.2.3` | `19.2.3` | `19.3.0` |
+| **React Native** | `0.76.9` | `0.79.6` | `0.81.5` | `0.83.10` | `0.85.3` | `0.86.3` | `0.88.1` |
+| **Expo Router** | `~4.0.0` | `~5.1.11` | `~6.0.24` | `~55.0.18` | `~56.2.22` | `~57.0.29` | `~58.0.28` |
+| **RN Screens** | `~4.4.0` | `~4.11.1` | `~4.16.0` | `~4.23.0` | `~4.26.0` | `~4.26.0` | `~4.30.0` |
+| **RN Reanimated** | `~3.16.1` | `~3.17.4` | `~4.1.1` | `4.2.1` | `4.3.1` | `4.5.1` | `4.7.1` |
+| **RN WebView** | `13.12.5` | `13.13.5` | `13.15.0` | `13.16.0` | `13.16.1` | `13.16.1` | `14.0.1` |
+| **Expo Camera** | `~16.0.0` | `~16.1.11` | `~17.0.10` | `~55.0.23` | `~56.0.8` | `~57.0.6` | `~58.0.14` |
+| **Expo Location** | `~18.0.0` | `~18.1.6` | `~19.0.8` | `~55.1.15` | `~56.0.26` | `~57.0.22` | `~58.0.20` |
+| **Expo Notifications**| `~0.29.0` | `~0.31.5` | `~0.32.17` | `~55.0.27` | `~56.0.26` | `~57.0.23` | `~58.1.7` |
+| **Expo File System** | `~18.0.0` | `~18.1.11` | `~19.0.24` | `~55.0.26` | `~56.0.11` | `~57.0.7` | `~58.0.13` |
+| **Expo Sharing** | `~13.0.0` | `~13.1.5` | `~14.0.5` | `~55.0.4` | `~56.0.5` | `~57.0.5` | `~58.0.6` |
 
 ---
 
-## 3. Phased Incremental Upgrade Plan
+## 2. Technical Risk & Incompatibility Analysis
+
+### 2.1 React 19 Transition (SDK 52 ➔ SDK 53)
+- **Component Signatures**: Function components no longer require `forwardRef`; `ref` is passed directly as a standard prop.
+- **Removal of `defaultProps`**: Function components with `defaultProps` must use standard ES6 default parameter syntax.
+- **Typing Updates**: `@types/react` must update to `~19.0.0`. In `src/components/ui.tsx`, style props and polymorphic component typing must align with React 19 JSX namespaces.
+- **Edge-to-Edge Android**: Android 15 edge-to-edge layout enforcement requires replacing legacy status bar padding with `react-native-edge-to-edge` or SafeArea insets.
+
+### 2.2 Expo Router & Reanimated Major Upgrades (SDK 53 ➔ SDK 54)
+- **Router v6**: Route transitions and nested stack parameter serialization update. Verify `mobile/app/(modules)/[module].tsx` dynamic parameter extraction via `useLocalSearchParams()`.
+- **Reanimated v4**: Migration from Reanimated 3 to 4 requires updating Babel plugins and worklet syntax.
+
+### 2.3 Package Version Alignment (SDK 54 ➔ SDK 55)
+- **Unified Package Versioning**: Starting in SDK 55, official Expo packages (`expo-camera`, `expo-location`, `expo-notifications`, `expo-router`) mirror the Expo SDK major version number (55.x).
+- **Hermes Bytecode Compatibility**: Bytecode versions advance; exported bundles from older SDKs cannot run on the newer Hermes engine.
+
+### 2.4 Bridgeless Architecture by Default (SDK 55 ➔ SDK 56)
+- **Bridgeless Mode**: React Native 0.85 disables the legacy C++ message bridge by default. All native communication operates via JSI (JavaScript Interface) and TurboModules.
+- **Native Interop Layer**: Libraries with legacy TurboModule shims must be verified.
+
+### 2.5 Modern Platform Toolchains (SDK 57 ➔ SDK 58)
+- **Android Target SDK 35/36 & iOS 18**: Stricter background permission rules for location tracking (`ACCESS_BACKGROUND_LOCATION`) and push notifications (`POST_NOTIFICATIONS`).
+- **WebView 14.0+**: Modernized cookie store and cache partition isolation.
+
+---
+
+## 3. Step-by-Step Migration Execution Protocol
+
+For each sequential step from $N$ to $N+1$:
 
 ```mermaid
-flowchart TD
-    PhaseA["Phase 1: SDK 52 Production Baseline (Current)
-    - React 18.3.1 + RN 0.76.9
-    - 18/18 expo-doctor pass
-    - Standalone Hermes bundles verified"]
-    
-    PhaseB["Phase 2: SDK 53 Staging Canary
-    - Branch: feature/expo-sdk-53
-    - React 19.0.0 compatibility pass
-    - Test WebView bridge & Geofence background tasks
-    - Test on staging-oms.finixhr.com"]
-    
-    PhaseC["Phase 3: SDK 54 LTS Release
-    - Enable New Architecture (Fabric)
-    - Full E2E Native Device QA
-    - Production EAS Build (AAB + IPA)"]
+flowchart LR
+    Step1["1. Branch & Bump
+    npx expo install expo@N+1"]
+    Step2["2. Dependency Fix
+    npx expo install --fix"]
+    Step3["3. Diagnostics
+    npx expo-doctor"]
+    Step4["4. Typecheck
+    npm run typecheck"]
+    Step5["5. Bundle Export
+    npx expo export -p android/ios"]
+    Step6["6. Native Prebuild & Commit"]
 
-    PhaseA --> PhaseB --> PhaseC
+    Step1 --> Step2 --> Step3 --> Step4 --> Step5 --> Step6
 ```
 
-### Phase 1: SDK 52 Production Baseline (CURRENT STABLE)
-- **Status:** ✅ Completed and Verified
-- Pinned all dependencies via `npm install --legacy-peer-deps`
-- Configured dynamic API URL resolution via `EXPO_PUBLIC_API_BASE_URL` with fallback to `https://oms.finixhr.com`
-- Implemented `isTrustedUrl` WebView security perimeter preventing bearer token leaks
-- Implemented native payslip HTML downloads and native file sharing (`expo-file-system`, `expo-sharing`)
-- Verified continuous native generation (`prebuild`) and asset resolution
-
-### Phase 2: Staging Canary (SDK 53 Upgrade)
-*Target Timeline: Post Initial Production Release (Q1 2027)*
-1. Create isolated Git branch `feature/expo-sdk-53`.
-2. Execute automated alignment:
+### Detailed Checkpoint Checklist per SDK:
+1. **Create Branch**: `git checkout -b chore/upgrade-expo-sdk-<version>`
+2. **Upgrade Core**: `npx expo install expo@<target-version>`
+3. **Align Dependencies**: `npx expo install --fix`
+4. **Run Expo Doctor**: `npx expo-doctor` (must report 100% pass)
+5. **Run TypeScript Check**: `npm run typecheck` (zero type errors)
+6. **Compile Hermes Bundles**:
    ```bash
-   npx expo install expo@^53.0.0 --fix
-   ```
-3. Audit `package.json` to ensure `react` upgrades to `19.0.0` and `@types/react` to `~19.0.0`.
-4. Run Metro bundler and check for deprecated `StyleProp` and `DimensionValue` conversions:
-   ```bash
-   npm run typecheck
    npx expo export --platform android
+   npx expo export --platform ios
    ```
-5. Deploy canary APK built with `--profile preview` pointing to `https://staging-oms.finixhr.com`.
-6. Validate background location tracking (`expo-task-manager`) on Android 14/15 battery optimization regimes.
-
-### Phase 3: Production Rollout (SDK 54 LTS)
-1. Merge SDK 53 verified baseline into `main`.
-2. Bump to SDK 54 LTS:
+7. **Regenerate Native Projects**:
    ```bash
-   npx expo install expo@^54.0.0
+   npx expo prebuild --clean --no-install
    ```
-3. In `mobile/app.json`, set `"newArchEnabled": true` under android/ios.
-4. Execute full smoke suite covering:
-   - GPS check-in / check-out with geofencing
-   - Camera barcode / ID badge scan
-   - Biometric session unlock (Keychain / Keystore)
-   - Native push notification token exchange with `/api/hrm` dispatcher
-5. Tag release `v1.1.0` and trigger automated EAS cloud production build (`eas build --platform all --profile production`).
+8. **Commit Checkpoint**:
+   ```bash
+   git commit -m "feat(mobile): complete incremental migration checkpoint to Expo SDK <version>"
+   ```

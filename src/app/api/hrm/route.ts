@@ -220,12 +220,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Cross-origin request blocked", code: 403 }, { status: 403 })
     }
 
-    // session token: cookie first (httpOnly, primary), Authorization Bearer fallback
-    // (covers embedded/proxy contexts where the browser rejects cookies)
+    // session token: Bearer header takes precedence for non-ambient API clients (mobile/desktop).
+    // httpOnly cookie is used for web browser sessions (ambient credentials).
     const authHeader = req.headers.get("authorization") || ""
     const bearer = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : null
     const cookieToken = req.cookies.get("hrm_session")?.value || null
-    const token = cookieToken || bearer || undefined
+    const isBearerAuth = !!bearer
+    const token = bearer || cookieToken || undefined
     // H-7 — client IP via the shared resolver: X-Forwarded-For is only honored
     // behind a configured trusted proxy (HRM_TRUST_PROXY=1). Otherwise null and
     // auth throttles fall back to email-bound keys (see authThrottleKeys).
@@ -295,7 +296,8 @@ export async function POST(req: NextRequest) {
     // of auth.me gains nothing: the action mutates nothing and its response is
     // unreadable cross-origin (this server never grants CORS reads).
     const isCsrfBootstrap = action === "auth.me"
-    if (cookieToken && !bearer && !carriesCapability && !carriesPrimaryCredential && !isCsrfBootstrap && ctx) {
+    // When authenticated via ambient cookie (not Bearer header), CSRF token in X-CSRF-Token is mandatory.
+    if (!isBearerAuth && cookieToken && !carriesCapability && !carriesPrimaryCredential && !isCsrfBootstrap && ctx) {
       const presented = req.headers.get("x-csrf-token") || ""
       if (!ctx.csrfToken || !safeEqual(presented, ctx.csrfToken)) {
         return NextResponse.json({ ok: false, error: "Missing or invalid CSRF token — reload the page and try again", code: 403 }, { status: 403 })
