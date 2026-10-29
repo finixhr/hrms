@@ -1,0 +1,110 @@
+# ============ One-command local stack (Wave 4 A2, 2026-10-08) ============
+#   docker compose up --build                  → app + PostgreSQL 17
+#   docker compose --profile redis up --build   → … + Redis (shared cache,
+#                                                distributed locks, rate
+#                                                buckets — Wave 11 §2/§4)
+#   docker compose --profile redis --profile pooling up --build
+#                                                → … + PgBouncer in front of
+#                                                PostgreSQL (Wave 11 §3)
+#
+# The app container is stateless: on boot it waits for Postgres, runs
+# `prisma migrate deploy` (additive-only), then serves on :4000.
+# First boot with an empty volume gives you a fresh schema; seed data with:
+#   docker compose exec app bun -e "…or mount scripts/"  — see
+#   DEPLOYMENT-GUIDE.md §Docker for the seed procedure.
+#
+# MULTI-INSTANCE (Wave 11 §2): compose scale works out of the box — every
+# shared state (sessions, BgJob queue, coordination locks, transactional
+# outbox, L2 entitlement cache) lives in PostgreSQL/Redis, not in the
+# process. Scale and put a balancer in front:
+#   docker compose up --scale app=3      # then front :4000 with deploy/Caddyfile.lb
+# (for per-instance ports, run the standalone server natively per §2 of
+#  docs/SCALING.md instead — compose maps a single host port)
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hrm
+    volumes:
+      - finix-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Not exposed to the host by default — uncomment to inspect with psql:
+    # ports:
+    #   - "55432:5432"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/hrm
+      # Wave 11 — shared-cache/lock/rate backend. Empty (single instance,
+      # no --profile redis) = in-process fallbacks only. When you run the
+      # redis profile, point REDIS_URL at the service (export from your
+      # shell/.env BEFORE `up`, e.g. REDIS_URL=redis://redis:6379/0):
+      #   REDIS_URL=redis://redis:6379/0 docker compose --profile redis up
+      REDIS_URL: "${REDIS_URL:-}"
+      HRM_JOBS_ENABLED: "true"
+      ZKTECO_ADMS_ENABLED: "true"
+      # SEC-2 (Phase 1) — REQUIRED, no default. The old `${HRM_MFA_KEY:-<64
+      # zeros>}` silently booted every keyless invocation with a PUBLICLY KNOWN
+      # encryption key (it ships in this file): all MFA secrets, camera
+      # credentials, device comm keys and webhook secrets were encrypted under
+      # a key anyone can read. The `:?` form makes compose REFUSE to start
+      # unless HRM_MFA_KEY is exported in the operator's shell/.env.
+      # Generate once: openssl rand -hex 32
+      HRM_MFA_KEY: "${HRM_MFA_KEY:?HRM_MFA_KEY must be set (openssl rand -hex 32) — the app refuses to run with a publicly-known encryption key}"
+      # Optional Sentry/GlitchTip-compatible error tracking
+      TELEMETRY_DSN: "${TELEMETRY_DSN:-}"
+    ports:
+      - "4000:4000"
+
+  # Optional message/queue backbone for shared multi-instance state
+  # (Wave 11): distributed scheduler locks + cluster-wide rate buckets
+  # (coordination.ts) and the L2 entitlement/metadata cache (cache.ts).
+  # Enable with: --profile redis  (+ export REDIS_URL — see the app service)
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - finix-redis:/data
+
+  # Optional connection pooling in front of PostgreSQL (Wave 11 §3).
+  # With this profile ON, point DATABASE_URL at pgbouncer:6432 instead of
+  # db:5432 (and add ?pgbouncer=true — see deploy/pgbouncer/pgbouncer.ini).
+  # Credentials here mirror the local dev db user/password.
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    profiles: ["pooling"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: hrm
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "400"
+      DEFAULT_POOL_SIZE: "20"
+      AUTH_TYPE: scram-sha-256
+    ports:
+      - "6432:6432"
+
+volumes:
+  finix-db:
+  finix-redis:

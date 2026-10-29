@@ -1,0 +1,83 @@
+# ============ PRODUCTION Caddyfile (audit H-14 remediation + C-03 device TLS) ============
+# This is the deployable reverse-proxy configuration. It has NO port-forwarding
+# primitive, NO plaintext listener, and enables automatic HTTPS.
+#
+#   caddy run --config deploy/Caddyfile
+#
+# ┌────────────────────────────────────────────────────────────────────────────┐
+# │ ⚠ REPLACE THE PLACEHOLDER DOMAINS BEFORE DEPLOYING (audit L-31):           │
+# │   finixhr-hrm.example.com        → your employee/admin plane hostname    │
+# │   devices.finixhr-hrm.example.com → your device-plane hostname           │
+# │ Both names must resolve to this server and be provisioned via DNS first    │
+# │ (Caddy obtains Let's Encrypt certificates automatically). Air-gapped       │
+# │ device LANs: replace the site address with `https://<lan-ip>` + `tls      │
+# │ internal` (see the device-plane block below).                              │
+# └────────────────────────────────────────────────────────────────────────────┘
+#
+# NOTE: the Caddyfile at the repository ROOT is a sandbox-only helper that
+# forwards the embedded-preview port query parameter to local ports — it is
+# NOT for deployment. scripts/ci.sh fails if that sandbox pattern leaks into
+# this deployable config.
+
+# ---------------------------------------------------------------------------
+# Human/admin plane — full site with browser security headers.
+# ---------------------------------------------------------------------------
+finixhr-hrm.example.com {
+        encode gzip zstd
+
+        # security headers mirrored from next.config.ts (defense in depth at the edge)
+        header {
+                Strict-Transport-Security "max-age=31536000; includeSubDomains"
+                X-Content-Type-Options "nosniff"
+                Referrer-Policy "strict-origin-when-cross-origin"
+                -X-Powered-By
+        }
+
+        # HRM app (Next.js standalone on :3000)
+        reverse_proxy 127.0.0.1:3000
+
+        # sane timeouts for long payroll requests
+        request_body {
+                max_size 25MB
+        }
+}
+
+# ---------------------------------------------------------------------------
+# Device plane (C-03) — biometric terminals push to /iclock/* over TLS.
+# ZKTeco SpeedFace/SenseFace firmware supports HTTPS push (ADMS "URL + port"
+# with HTTPS). Devices that only speak HTTP are redirected to HTTPS — they
+# will re-push automatically after the 302.
+#
+# Caddy automatically provisions a certificate for the device hostname via
+# ACME (HTTP-01/TLS-ALPN). For a device LAN without outbound internet, replace
+# the site block with an internal CA (`tls internal`) — devices must then
+# trust the Caddy root CA (docs/zkteco-adms-integration.md § Comm Key & TLS).
+# ---------------------------------------------------------------------------
+devices.finixhr-hrm.example.com {
+        encode gzip zstd
+
+        header {
+                Strict-Transport-Security "max-age=31536000"
+                X-Content-Type-Options "nosniff"
+                -X-Powered-By
+        }
+
+        # device pushes are small (≤256 KB ATTLOG / 2 MB photo) — cap them at the
+        # edge so oversized junk never reaches the app
+        request_body {
+                max_size 3MB
+        }
+
+        # long timeouts: devices poll slowly (LOGDELAY 60s) and retry a lot
+        reverse_proxy 127.0.0.1:3000 {
+                transport http {
+                        response_header_timeout 120s
+                }
+        }
+}
+
+# Plaintext device listener → redirect to the HTTPS device plane (C-03).
+# Older firmware that defaults to http:// gets upgraded on its next push.
+http://devices.finixhr-hrm.example.com {
+        redir https://devices.finixhr-hrm.example.com{uri} permanent
+}

@@ -1,0 +1,8 @@
+[test]
+# C-01 test infra — the preload sets DATABASE_URL to the isolated unit-test
+# PostgreSQL database (and (re)creates its schema) BEFORE any test file's module
+# graph can construct the PrismaClient singleton (utils.ts imports @/lib/db
+# transitively, so import-order bootstrapping inside test files is not enough).
+# Test DB selection: TEST_DATABASE_URL env → .env TEST_DATABASE_URL → localhost
+# default; URLs containing "production" are refused (tests never touch prod).
+preload = ["./tests/preload.ts"]

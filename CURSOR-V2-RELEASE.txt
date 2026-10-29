@@ -1,0 +1,33 @@
+FINIX HR — CURSOR v2 RELEASE
+=============================
+
+This build includes the complete Cursor v2 system:
+
+1. THREE premium cursor designs (Owner Console → Website Studio → Cursor Effect)
+   - Aurora  : liquid gradient orb + trailing light + velocity squash
+   - Comet   : bright core + playful 12-particle ribbon
+   - Classic : minimal dot + glass ring
+
+2. Performance fixes
+   - Animation loop fully SLEEPS when the pointer is idle (verified:
+     0 style writes while idle, 17ms median frames, no long tasks)
+   - All motion is transform/opacity only; backdrop-filter removed
+   - Diff-cached style writes; coalesced hover resolution
+
+3. New owner configuration
+   - Primary + accent cursor colors (with 6 presets, theme-adaptive)
+   - Magnetic pull strength slider (0-10)
+   - Movement trail intensity slider (0-100)
+   - Glow intensity slider (0-100)
+
+4. Scope: the custom cursor runs ONLY on the public website.
+   The owner console and tenant HRM panel always use the native cursor.
+
+Verification: 60/60 E2E · 10/10 production perf checks · 759/759 unit tests
+tsc 0 errors · eslint 0 problems · production build SUCCESS
+
+Quick start:
+  bun install
+  cp .env.example .env   (fill DATABASE_URL + keys)
+  bunx prisma migrate deploy
+  bun run dev

@@ -1,0 +1,4453 @@
+// Finix HR — Complete domain schema
+// Multi-tenant: nearly every model carries vendorId. Historical records are
+// append-only (EmployeeHistory, SalaryRevision, Promotion, Transfer, paid payroll).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================ FOUNDATION ============================
+
+model Vendor {
+  id                   String   @id @default(cuid())
+  name                 String
+  code                 String   @unique
+  legalName            String?
+  logoUrl              String?
+  address              String?
+  phone                String?
+  email                String?
+  // authorized letter signatory (spec §13.5)
+  signatoryName        String?
+  signatoryDesignation String?
+  signatureUrl         String? // data URL (client-resized) or http URL
+  sealUrl              String? // company seal / round stamp image
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  // R11 (2026-10-12) — SaaS-owner marketing consent: a tenant may opt out of
+  // platform marketing/promotional/campaign emails & SMS. Owner-plane
+  // campaign sends exclude opted-out vendors; transactional notices
+  // (invoices, expiry reminders, application status) are NEVER affected.
+  marketingOptOut      Boolean  @default(false)
+  // SaaS platform back-relation (platform plane — see SaaS* block at the
+  // bottom of this file; the tenant HRM code never queries it)
+  saasSubscriptions    SaasSubscription[]
+}
+
+model User {
+  id                       String    @id @default(cuid())
+  vendorId                 String
+  employeeId               String?
+  email                    String
+  passwordHash             String
+  name                     String
+  phone                    String?
+  role                     String // HR_ADMIN | HR_MANAGER | PAYROLL_OFFICER | BRANCH_MANAGER | DEPT_MANAGER | EMPLOYEE | VENDOR_OWNER
+  permissions              String    @default("[]") // JSON array of "module.action" grants; [] = derive from role template
+  branchId                 String? // scope limit
+  departmentId             String? // scope limit
+  status                   String    @default("ACTIVE") // ACTIVE | SUSPENDED | DISABLED
+  lastLoginAt              DateTime?
+  failedLoginCount         Int       @default(0)
+  lockedUntil              DateTime?
+  passwordChangedAt        DateTime?
+  // First-login forced password rotation: set true when an account is created
+  // (employee self-service onboarding / admin password reset) with a temporary
+  // password. Login then routes through the forced change step and the flag is
+  // cleared by changePassword(). Independent of the 90-day expiry policy so it
+  // works even when password expiry is disabled.
+  mustChangePassword       Boolean   @default(false)
+  passwordHistory          String    @default("[]") // JSON array of previous hashes (policy reuse check)
+  mfaEnrolled              Boolean   @default(false)
+  // 2026-10-25 design systems (master prompt Part L): per-user platform design
+  // preference ("comet" | "cursor-1" | "cursor-2"); null = follow tenant +
+  // platform defaults. Applied by the pre-paint script + app shell.
+  designPreference         String?
+  passwordResetToken       String? // sha-256 of the emailed reset code
+  passwordResetExpiresAt   DateTime?
+  passwordResetRequestedAt DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  sessions                 Session[]
+
+  @@unique([vendorId, email])
+  @@index([email]) // M-15 — login lookup: no full-table scan on the hot path
+  @@index([vendorId])
+}
+
+model Session {
+  id         String   @id
+  // SEC-02 (R5) — session tokens are hashed at rest, exactly like API keys and
+  // refresh tokens always were. New rows: id is a random ROW id (never the
+  // credential) + tokenHash = sha256(cookie token); lookups go through the
+  // hash. Migration 9_wave9zm backfilled tokenHash on legacy rows (their id
+  // stays the legacy plaintext until they expire — the rotation window).
+  tokenHash  String?  @unique
+  userId     String
+  expiresAt  DateTime
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now()) // idle-timeout policy (Settings → Session Policy)
+  // C-4/H-13 hardening: session kind (PREAUTH = MFA/expiry challenge carrier, carries no app
+  // rights) + per-session CSRF token (echoed by the SPA in X-CSRF-Token on every mutating RPC).
+  kind       String   @default("FULL") // FULL | PREAUTH
+  csrfToken  String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  // SCL-19 (Phase 2 WS5) — the daily expired-session purge deletes on
+  // expiresAt; without this index the purge seq-scanned the whole table.
+  @@index([expiresAt])
+}
+
+// TOTP enrolment secrets + hashed recovery codes (HRM-006 MFA / 2FA)
+model UserMfaSecret {
+  id                String   @id @default(cuid())
+  vendorId          String
+  userId            String   @unique
+  secretEnc         String // encrypted TOTP shared secret
+  recoveryCodesHash String   @default("[]") // JSON array of sha256 hashes
+  lastUsedCounter   Int? // M-16 — TOTP replay protection: highest accepted HMAC counter
+  enrolledAt        DateTime @default(now())
+
+  @@index([vendorId])
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  vendorId    String
+  key         String // HR_ADMIN ...
+  name        String
+  description String?
+  permissions String  @default("[]") // JSON string[]
+  isSystem    Boolean @default(false)
+  mfaRequired Boolean @default(false) // HRM-006: force TOTP for users in this role
+
+  @@unique([vendorId, key])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  vendorId  String
+  userId    String?
+  userName  String?
+  action    String // e.g. employees.update
+  entity    String
+  entityId  String?
+  summary   String
+  oldValue  String?
+  newValue  String?
+  ip        String?
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([vendorId, createdAt])
+  @@index([vendorId, entity])
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  vendorId   String
+  userId     String? // null = broadcast to vendor users matched by role
+  employeeId String?
+  title      String
+  message    String
+  type       String // LEAVE | PAYROLL | ATTENDANCE | TASK | LOAN | EXPENSE | DOC | LETTER | WISH | SYSTEM | ANNOUNCEMENT | EXIT | KP
+  link       String? // nav target
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([vendorId, userId])
+  @@index([vendorId, employeeId])
+}
+
+model CompanyEvent {
+  id          String   @id @default(cuid())
+  vendorId    String
+  title       String
+  type        String // MEETING | EVENT | HR_EVENT | PAYROLL_TASK
+  date        String // ISO date
+  time        String?
+  description String?
+  branchId    String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  @@index([vendorId, date])
+}
+
+// ============================ APPROVAL WORKFLOW ENGINE ============================
+
+model ApprovalWorkflow {
+  id          String   @id @default(cuid())
+  vendorId    String
+  name        String
+  processType String // LEAVE | LOAN | EXPENSE | PAYROLL | LETTER | RESIGNATION | ADVANCE | PROMOTION | TRANSFER | SALARY_REVISION | OVERTIME | ENCASHMENT | GOODS_REQUISITION | PURCHASE | ASSET_ISSUE
+  active      Boolean  @default(true)
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@unique([vendorId, processType])
+}
+
+model ApprovalStep {
+  id              String  @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from ApprovalWorkflow).
+  vendorId String
+  workflowId      String
+  sequence        Int
+  name            String
+  approverRole    String? // role key that can act
+  approverUserId  String? // specific approver
+  departmentScope Boolean @default(false) // route to employee's dept manager
+  branchScope     Boolean @default(false) // route to employee's branch manager
+  amountThreshold Float?
+  required        Boolean @default(true)
+  allowDelegation Boolean @default(false)
+  rejectBehavior  String  @default("REJECT_ALL") // REJECT_ALL | RETURN_TO_PREVIOUS
+
+  @@unique([vendorId, workflowId, sequence])
+  @@index([vendorId, workflowId])
+}
+
+model ApprovalRequest {
+  id          String    @id @default(cuid())
+  vendorId    String
+  workflowId  String
+  processType String
+  entityType  String // LeaveRequest | Loan | ...
+  entityId    String
+  entityRef   String? // human reference (employee name etc.)
+  requestedBy String
+  currentStep Int       @default(1)
+  status      String    @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED | WITHDRAWN
+  payloadJson String    @default("{}")
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([vendorId, status])
+  @@index([vendorId, processType])
+}
+
+model ApprovalAction {
+  id        String   @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from ApprovalRequest).
+  vendorId String
+  requestId String
+  step      Int
+  userId    String? // null = system AUTO action (H-4 threshold auto-skip)
+  userName  String
+  action    String // APPROVE | REJECT | SKIP
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([vendorId, requestId])
+}
+
+// ============================ SETTINGS & CALENDAR ============================
+
+model HrSetting {
+  id        String   @id @default(cuid())
+  vendorId  String
+  group     String // general | attendance | geofence | leave | payroll | ait | shift | notification | wishes
+  key       String
+  value     String // JSON
+  updatedAt DateTime @updatedAt
+
+  @@unique([vendorId, group, key])
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  vendorId  String
+  branchId  String? // null = all branches
+  name      String
+  date      String // ISO date
+  type      String   @default("PUBLIC") // PUBLIC | OPTIONAL | COMPANY
+  createdAt DateTime @default(now())
+
+  @@index([vendorId, date])
+}
+
+// ============================ ORGANIZATION ============================
+
+model Branch {
+  id                String     @id @default(cuid())
+  vendorId          String
+  code              String
+  name              String
+  type              String     @default("STORE") // STORE | OFFICE | WAREHOUSE | OTHER
+  address           String?
+  managerId         String? // employee id
+  contact           String?
+  operatingHours    String?
+  latitude          Float?
+  longitude         Float?
+  geofenceRadius    Float? // meters
+  geofenceActive    Boolean    @default(false)
+  geofenceStartTime String? // fence-local attendance window start (spec §7.5)
+  geofenceEndTime   String? // fence-local attendance window end (spec §7.5)
+  active            Boolean    @default(true)
+  employees         Employee[] @relation("EmployeeBranch") // H-10 back-relation
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@unique([vendorId, code])
+  @@index([vendorId])
+}
+
+model Department {
+  id          String     @id @default(cuid())
+  vendorId    String
+  code        String
+  name        String
+  nameBn      String?
+  description String?
+  branchId    String?
+  headId      String? // employee id
+  employees   Employee[] @relation("EmployeeDepartment")
+  status      String     @default("ACTIVE")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([vendorId, code])
+  @@index([vendorId])
+}
+
+model Designation {
+  id           String     @id @default(cuid())
+  vendorId     String
+  code         String
+  name         String
+  nameBn       String?
+  employees    Employee[] @relation("EmployeeDesignation")
+  departmentId String?
+  grade        String?
+  minSalary    Float?
+  maxSalary    Float?
+  description  String?
+  status       String     @default("ACTIVE")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([vendorId, code])
+  @@index([vendorId])
+}
+
+// ============================ SHIFT ENGINE ============================
+
+model Shift {
+  id                    String   @id @default(cuid())
+  vendorId              String
+  name                  String
+  type                  String   @default("FIXED") // FIXED | ROTATIONAL
+  startTime             String // HH:MM
+  endTime               String // HH:MM
+  graceMinutes          Int      @default(10)
+  breakMinutes          Int      @default(60)
+  minWorkingHours       Float    @default(8)
+  otThresholdMinutes    Int      @default(30) // minutes beyond shift end eligible for OT
+  otMultiplier          Float    @default(1.5) // weekday OT rate
+  otHolidayMultiplier   Float    @default(2.0) // government-holiday OT rate (spec §7.6)
+  otWeeklyOffMultiplier Float    @default(2.0) // weekly-off OT rate (spec §7.6)
+  weeklyOff             String   @default("FRIDAY") // comma list
+  branchId              String? // null = all branches
+  active                Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([vendorId])
+}
+
+model ShiftAssignment {
+  id         String   @id @default(cuid())
+  vendorId   String
+  employeeId String
+  shiftId    String
+  fromDate   String
+  toDate     String?
+  note       String?
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  @@index([vendorId, employeeId])
+  @@index([vendorId, fromDate])
+}
+
+// ============================ EMPLOYEE MASTER ============================
+
+model Employee {
+  id                     String       @id @default(cuid())
+  vendorId               String
+  code                   String // EMP-0001
+  // MOD-17 (Phase 2 WS4) — pg_trgm GIN indexes on fullName + code live in
+  // migration 9_wave9zf (Prisma has no native trigram declaration); they serve
+  // the directory/picker ILIKE searches.
+  photoUrl               String?
+  // 96×96 list thumbnail (data URL) generated client-side together with
+  // photoUrl — directory rows / org-chart nodes ship the thumb instead of
+  // the 512×512 photoUrl so employees.list payloads stay small. Falls back
+  // to photoUrl for photos uploaded before this column existed.
+  photoThumb             String?
+  fullName               String
+  nameBn                 String?
+  preferredName          String?
+  fatherName             String?
+  motherName             String?
+  spouseName             String?
+  dob                    String? // ISO
+  placeOfBirth           String?
+  gender                 String?
+  bloodGroup             String?
+  maritalStatus          String?
+  nationality            String       @default("Bangladeshi")
+  religion               String?
+  mobile                 String?
+  altMobile              String?
+  personalEmail          String?
+  officialEmail          String?
+  emergencyName          String?
+  emergencyRelation      String?
+  emergencyMobile        String?
+  presentAddress         String?
+  permanentAddress       String?
+  division               String?
+  district               String?
+  city                   String?
+  postCode               String?
+  presentDivision        String?
+  presentDistrict        String?
+  presentCity            String?
+  presentPostCode        String?
+  addressSame            Boolean      @default(false)
+  // employment
+  branchId               String?
+  departmentId           String?
+  designationId          String?
+  reportingManagerId     String?
+  hrManagerId            String?
+  supervisorId           String?
+  // H-10 — referential integrity: org anchors are Restrict (an employee row
+  // pins its branch/department/designation; deleting the org node must be
+  // blocked while employees reference it).
+  branch                 Branch?      @relation("EmployeeBranch", fields: [branchId], references: [id], onDelete: Restrict)
+  department             Department?  @relation("EmployeeDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  designation            Designation? @relation("EmployeeDesignation", fields: [designationId], references: [id], onDelete: Restrict)
+  workLocation           String?
+  joiningDate            String?
+  confirmationDate       String?
+  probationMonths        Int          @default(3)
+  // EXT-05 (R7) — rehire linkage: a rehired employee points at their prior
+  // Employee row so service history (and statutory gratuity continuity
+  // decisions) stays reachable. Cleared/derived fields never copy over.
+  priorEmployeeId        String?
+  employmentType         String       @default("PERMANENT") // PERMANENT | PROBATIONARY | CONTRACTUAL | TEMPORARY | PART_TIME | INTERN | COMMISSION | FREELANCE
+  status                 String       @default("ACTIVE") // ACTIVE | PROBATION | ON_LEAVE | SUSPENDED | RESIGNED | TERMINATED | RETIRED | INACTIVE
+  category               String?
+  grade                  String?
+  shiftId                String?
+  weeklyOff              String?
+  contractStart          String?
+  contractEnd            String?
+  otEligible             Boolean      @default(true) // overtime eligibility (spec §7.6)
+  previousEmployerIncome Float        @default(0) // current-FY income from previous employer (spec §9.5)
+  taxAlreadyDeducted     Float        @default(0) // tax already deducted this FY (spec §9.5)
+  // Salary payout method (2026-10 round §42–§46): BANK | CASH | MFS. NULL =
+  // not yet configured (legacy employees) — the payout resolver treats NULL
+  // as CASH for validation only when the salary is within the cash/MFS
+  // threshold, and blocks payment until configured above it.
+  salaryPayoutMethod     String?
+  salaryPayoutAccountId  String? // designated BankAccount.id (BANK/MFS methods)
+  // ---- AIT (Income Tax Act 2023) per-employee tax profile ----
+  taxTin                 String? // 12-digit e-TIN
+  taxCategory            String? // general | female | senior | disabled | third_gender | freedom_fighter | july_warrior | non_resident
+  declaredInvestment     Float? // declared investment for Sec 78 rebate (AY-current)
+  festivalBonusOverride  Float? // explicit bonus count (× monthly basic) for annual projection
+  annualGrossOverride    Float? // explicit annual gross — bypasses projection entirely
+  // ---- r8 audit (2026-10-14): surcharge inputs (FO 2025 / FA 2026 net-wealth bands) ----
+  taxNetWealth           Float? // declared net worth — surcharge band test; null = not assessed (warns)
+  taxMotorVehicles       Int     @default(0) // motor cars owned — >1 triggers the 10% surcharge band
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  // H-10 — back-relations from money/history tables (Restrict everywhere:
+  // employees with payroll/leave/loan history cannot be hard-deleted via the
+  // DB layer; the app enforces archive-first semantics)
+  leaveRequests  LeaveRequest[]
+  loans          Loan[]
+  payrollEntries PayrollEntry[]
+
+  @@unique([vendorId, code])
+  @@unique([vendorId, id]) // H-10 — structural tenant scoping for joins
+  @@index([vendorId, status])
+  @@index([vendorId, branchId])
+  @@index([vendorId, departmentId])
+
+  // M-6 — identity backing for the app-level dedup (bulk import + create both
+  // check these); partial in effect: NULL mobile/officialEmail rows are exempt
+  // (PostgreSQL treats NULLs as distinct). Deploying the migration against data
+  // that ALREADY has duplicates fails loudly — run
+  // scripts/check-employee-identity-uniques.ts first.
+  @@unique([vendorId, officialEmail])
+  @@unique([vendorId, mobile])
+  @@index([vendorId, priorEmployeeId])
+}
+
+model FamilyMember {
+  id           String  @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from Employee).
+  vendorId String
+  employeeId   String
+  name         String
+  relationship String
+  dob          String?
+  gender       String?
+  occupation   String?
+  mobile       String?
+  email        String?
+  address      String?
+  dependent    Boolean @default(false)
+  notes        String?
+
+  @@index([vendorId, employeeId])
+}
+
+model Education {
+  id              String  @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from Employee).
+  vendorId String
+  employeeId      String
+  degree          String
+  examination     String?
+  institution     String?
+  board           String?
+  major           String?
+  passingYear     String?
+  result          String?
+  certificateName String? // certificate attachment (spec §5.4)
+  certificateData String? // data URL payload
+  notes           String?
+
+  @@index([vendorId, employeeId])
+}
+
+model Referee {
+  id                 String    @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from Employee).
+  vendorId String
+  employeeId         String
+  name               String
+  relationship       String?
+  organization       String?
+  designation        String?
+  mobile             String?
+  email              String?
+  address            String?
+  knownFor           String?
+  type               String    @default("PROFESSIONAL") // PROFESSIONAL | PERSONAL | PREVIOUS_EMPLOYER | GUARDIAN | OTHER
+  notes              String?
+  verificationStatus String    @default("PENDING") // PENDING | VERIFIED | FAILED
+  verifiedAt         DateTime?
+  verifiedBy         String?
+
+  @@index([vendorId, employeeId])
+}
+
+model PreviousEmployment {
+  id               String  @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from Employee).
+  vendorId String
+  employeeId       String
+  company          String
+  designation      String?
+  department       String?
+  joinDate         String?
+  leaveDate        String?
+  lastSalary       Float?
+  reasonForLeaving String?
+  supervisor       String?
+  contact          String?
+  notes            String?
+
+  @@index([vendorId, employeeId])
+}
+
+model BankAccount {
+  id                    String  @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from Employee).
+  vendorId String
+  employeeId            String
+  holderName            String?
+  bank                  String?
+  branch                String?
+  accountNumber         String?
+  routingNumber         String?
+  accountType           String  @default("SALARY") // SAVINGS | CURRENT | SALARY
+  mfsProvider           String? // BKASH | NAGAD | ROCKET | OTHER
+  mfsNumber             String?
+  paymentMethod         String  @default("BANK") // BANK | MFS | CASH | OTHER
+  isPrimary             Boolean @default(true)
+  verified              Boolean @default(false)
+  // Salary-payout designation (2026-10 round §42): isPrimary is a generic
+  // "default account" flag and does NOT mean "salary payout account". Exactly
+  // ONE account per employee may carry isSalaryPayoutAccount=true; the payout
+  // resolver enforces uniqueness and falls back to the migrated single-account
+  // case for legacy rows (backfill sets this flag on single-account employees).
+  isSalaryPayoutAccount Boolean @default(false)
+
+  @@index([vendorId, employeeId])
+  @@index([vendorId, employeeId, isSalaryPayoutAccount])
+}
+
+model EmployeeDocument {
+  id               String    @id @default(cuid())
+  vendorId         String
+  employeeId       String
+  category         String    @default("IDENTITY") // IDENTITY | EDUCATION | EXPERIENCE | CONTRACT | OTHER
+  docType          String // NID | PASSPORT | BIRTH_REG | DRIVING_LICENCE | OTHER_ID | CERTIFICATE | AGREEMENT | APPOINTMENT | CONFIRMATION | SUPPORTING
+  title            String
+  docNumber        String?
+  nameOnDoc        String?
+  issueDate        String?
+  expiryDate       String?
+  issuingAuthority String?
+  status           String    @default("VALID") // VALID | EXPIRING | EXPIRED | REJECTED
+  fileName         String?
+  fileData         String? // base64
+  notes            String?
+  verified         Boolean   @default(false)
+  verifiedBy       String?
+  verifiedAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([vendorId, employeeId])
+  @@index([vendorId, expiryDate])
+}
+
+// ============================ EMPLOYEE LIFECYCLE (IMMUTABLE) ============================
+
+model EmployeeHistory {
+  id            String   @id @default(cuid())
+  vendorId      String
+  employeeId    String
+  eventType     String // JOINED | PROMOTION | TRANSFER | SALARY_REVISION | STATUS_CHANGE | LEAVE | RESIGNATION | LETTER | WARNING | EXIT | TASK | REVIEW
+  title         String
+  description   String?
+  dataJson      String   @default("{}")
+  effectiveDate String?
+  amount        Float?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+
+  @@index([vendorId, employeeId, createdAt])
+}
+
+model Promotion {
+  id               String   @id @default(cuid())
+  vendorId         String
+  employeeId       String
+  oldDesignationId String?
+  newDesignationId String?
+  oldDepartmentId  String?
+  newDepartmentId  String?
+  oldGrade         String?
+  newGrade         String?
+  newBasicSalary   Float?
+  effectiveDate    String
+  reason           String?
+  status           String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvedBy       String?
+  createdAt        DateTime @default(now())
+
+  @@index([vendorId, employeeId])
+}
+
+model Transfer {
+  id                String   @id @default(cuid())
+  vendorId          String
+  employeeId        String
+  fromBranchId      String?
+  toBranchId        String?
+  fromDepartmentId  String?
+  toDepartmentId    String?
+  fromDesignationId String?
+  toDesignationId   String?
+  fromManagerId     String?
+  toManagerId       String?
+  fromShiftId       String?
+  toShiftId         String?
+  workLocation      String?
+  effectiveDate     String
+  reason            String?
+  status            String   @default("PENDING")
+  approvedBy        String?
+  createdAt         DateTime @default(now())
+
+  @@index([vendorId, employeeId])
+}
+
+model SalaryRevision {
+  id              String   @id @default(cuid())
+  vendorId        String
+  employeeId      String
+  previousSalary  Float
+  newSalary       Float
+  increaseAmount  Float
+  increasePercent Float
+  effectiveDate   String
+  reason          String?
+  type            String   @default("INCREMENT") // INCREMENT | STRUCTURE_CHANGE | NEW_STRUCTURE
+  status          String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvedBy      String?
+  createdAt       DateTime @default(now())
+
+  @@index([vendorId, employeeId])
+}
+
+// ============================ ATTENDANCE ============================
+
+model Attendance {
+  id                String   @id @default(cuid())
+  vendorId          String
+  employeeId        String
+  date              String // ISO date
+  shiftId           String?
+  checkIn           String? // HH:MM
+  checkOut          String? // HH:MM
+  workingMinutes    Int      @default(0)
+  lateMinutes       Int      @default(0)
+  earlyLeaveMinutes Int      @default(0)
+  overtimeMinutes   Int      @default(0)
+  status            String   @default("ABSENT") // PRESENT | ABSENT | LATE | EARLY_LEAVE | HALF_DAY | LEAVE | LEAVE_UNPAID | HOLIDAY | WEEKLY_OFF | WFH | BUSINESS_TRIP
+  source            String   @default("MANUAL") // MANUAL | BIOMETRIC | GEOFENCE | SELFIE | WEB | IMPORT (QR retired)
+  otApproved        Boolean? // null = auto-accepted (pre-approval-policy rows); false = pending approval; true = approved (spec §7.6)
+  deviceInfo        String?
+  latitude          Float?
+  longitude         Float?
+  accuracyM         Float?
+  ip                String?
+  remarks           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([vendorId, employeeId, date])
+  @@index([vendorId, date])
+}
+
+model AttendanceDevice {
+  id                    String    @id @default(cuid())
+  vendorId              String
+  deviceId              String // display code (operator-facing)
+  name                  String
+  branchId              String?
+  manufacturer          String?
+  model                 String?
+  location              String?
+  status                String    @default("ONLINE") // ONLINE | OFFLINE | ERROR (derived from lastSeenAt at read time)
+  syncStatus            String    @default("IDLE") // IDLE | SYNCING | ERROR
+  lastSyncAt            DateTime?
+  lastError             String?
+  // ---- ZKTeco ADMS push integration (additive — spec §7) ----
+  serialNumber          String? // full device serial (informational)
+  deviceIdentifier      String?   @unique // ADMS SN the device pushes — globally unique (endpoint has no tenant context)
+  protocol              String    @default("ADMS") // ADMS | LEGACY_SDK
+  enabled               Boolean   @default(true) // soft delete/deactivation — history is preserved
+  ipAddress             String?
+  port                  Int?
+  timezone              String    @default("Asia/Dhaka")
+  firmwareVersion       String?
+  pushVersion           String?
+  commKey               String? // M-20 — comm key ENCRYPTED at rest (enc::<iv.tag.enc>, AES-256-GCM under HRM_MFA_KEY, context devices::v1); shown ONCE at enrollment; legacy plaintext rows readable until rotated by scripts/encrypt-secrets-at-rest.ts; stripped from every API response
+  commKeyHash           String? // write-only device credential (scrypt salted hash, v2; legacy sha256 hex supported read-only) — never returned to the UI
+  commKeySalt           String? // H-2 — per-device scrypt salt (v2 key storage)
+  commKeySetAt          DateTime? // C-03 — when the comm key was enrolled (enrollment audit metadata)
+  lastSeenAt            DateTime?
+  lastAttendanceAt      DateTime?
+  clockDriftSec         Int? // device clock vs server clock (from live punches)
+  eventCount            Int       @default(0) // total accepted raw events
+  configuration         String    @default("{}") // adapter-specific tunables (JSON)
+  // R8 — historical backfill sync: while historySyncUntil is in the future the
+  // cdata ingest window for THIS device is widened to historySyncWindowDays so
+  // old punches re-uploaded by the device are accepted instead of rejected as
+  // OUT_OF_WINDOW. Set by devices.syncHistory; expires automatically.
+  historySyncUntil      DateTime?
+  historySyncWindowDays Int?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now()) @updatedAt
+
+  @@unique([vendorId, deviceId])
+  @@index([vendorId, enabled])
+}
+
+// Employee ↔ device enrollment mapping (spec §8) — stable device PIN, never names
+model AttendanceDeviceUser {
+  id               String    @id @default(cuid())
+  vendorId         String
+  deviceId         String
+  employeeId       String
+  deviceUserId     String // ZKTeco PIN on that specific device
+  enrollmentStatus String    @default("ACTIVE") // ACTIVE | INACTIVE (offboarding/transfer)
+  lastSyncedAt     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([deviceId, deviceUserId])
+  @@index([vendorId, employeeId])
+}
+
+// Immutable raw attendance events (spec §9) — retained for audit/reprocessing
+model AttendanceRawEvent {
+  id                String    @id @default(cuid())
+  vendorId          String
+  deviceId          String
+  deviceSerial      String
+  deviceUserId      String
+  employeeId        String? // resolved via AttendanceDeviceUser (null until mapped)
+  eventTime         String // "YYYY-MM-DD HH:MM:SS" — device wall clock (Asia/Dhaka), never modified
+  receivedAt        DateTime  @default(now())
+  verifyMode        Int? // 1 fingerprint, 3/15 face, 4 card …
+  attendanceStatus  Int? // raw device status code (0..5, 255 auto)
+  workCode          String?
+  eventType         String // IN | OUT | BREAK_OUT | BREAK_IN | OT_IN | OT_OUT | AUTO
+  rawLine           String // original ADMS line, immutable
+  payloadHash       String    @unique // deterministic fingerprint → idempotent ingestion (spec §10)
+  processingStatus  String    @default("RECEIVED") // RECEIVED | PROCESSING | PROCESSED | UNKNOWN_EMPLOYEE | FAILED | SKIPPED_MANUAL | DEAD_LETTER | OUT_OF_WINDOW (quarantined old punch — reprocessed on historical sync)
+  processingError   String?
+  processedAt       DateTime?
+  retryCount        Int       @default(0)
+  // M-07 — atomic claim + honest backoff: claimedAt marks the PROCESSING
+  // claim (stale claims self-heal), lastAttemptAt is when the LAST processing
+  // attempt happened (retry backoff is measured from this, not createdAt).
+  claimedAt         DateTime?
+  lastAttemptAt     DateTime?
+  // 2026-10 round §33 — provenance link to the normalized AttendanceEvent this
+  // raw punch was projected into (inspectable device-punch → event chain).
+  attendanceEventId String?
+  createdAt         DateTime  @default(now())
+
+  @@index([vendorId, deviceId, eventTime])
+  @@index([vendorId, employeeId, eventTime])
+  @@index([vendorId, processingStatus])
+  // SCL-3 (Phase 1, index half) — the global sweeper query filters on
+  // processingStatus ALONE (sweepOnce runs without a vendorId) with
+  // orderBy eventTime; the (vendorId, processingStatus) index above has
+  // vendorId as its leading column and cannot serve it, so every 15 s sweep
+  // was a full-table scan over the raw-event table. This index serves
+  // recoverStaleClaims' PROCESSING scan and the dead-letter/OUT_OF_WINDOW
+  // updateMany filters.
+  @@index([processingStatus, eventTime])
+  // SCL-3 full (Phase 2 WS2) — the fair per-vendor sweep pages by
+  // (vendorId, processingStatus IN (...)) ORDER BY eventTime LIMIT slice.
+  // With only the two indexes above, a vendor with a 20K-event backfill paid
+  // a sort of its whole pending set every 15 s pass; this composite serves
+  // the per-vendor page as a clean index-ordered LIMIT scan.
+  @@index([vendorId, processingStatus, eventTime])
+}
+
+// Device communication log (spec §16) — no secrets/biometric data, only metadata
+model DeviceCommLog {
+  id             String   @id @default(cuid())
+  vendorId       String
+  deviceId       String?
+  serial         String
+  endpoint       String
+  requestType    String // HANDSHAKE | ATTLOG | OPERLOG | GETREQUEST | DEVICECMD | REJECTED
+  httpStatus     Int
+  eventCount     Int      @default(0)
+  duplicateCount Int      @default(0)
+  ok             Boolean  @default(true)
+  durationMs     Int      @default(0)
+  error          String?
+  correlationId  String?
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  @@index([vendorId, deviceId, createdAt])
+  @@index([vendorId, createdAt])
+}
+
+// Queued device commands (ADMS getrequest channel) — CHECK etc.
+model DeviceCommand {
+  id        String    @id @default(cuid())
+  vendorId  String
+  deviceId  String
+  command   String // CHECK | REBOOT | CLEAR LOG | … (adapter-limited whitelist)
+  status    String    @default("QUEUED") // QUEUED | SENT | DONE | FAILED
+  result    String?
+  createdBy String?
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+  doneAt    DateTime?
+
+  @@index([vendorId, deviceId, status])
+}
+
+model AttendanceCorrection {
+  id           String    @id @default(cuid())
+  vendorId     String
+  employeeId   String
+  date         String
+  requestedIn  String?
+  requestedOut String?
+  reason       String
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  actedBy      String?
+  actedAt      DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([vendorId, status])
+}
+
+// ============================ WORKFORCE TRACKING & SECURE ATTENDANCE (2026-10 round) ============================
+// Architecture rules (requirements round §2–§5):
+//   Attendance          → payroll-facing DAILY summary (unchanged, one row/employee/date)
+//   AttendanceRawEvent  → immutable ZKTeco ADMS input (unchanged)
+//   AttendanceEvent     → NEW immutable normalized event layer (append-only; check-in,
+//                         check-out, periodic checks, device punches, GPS-state events)
+//   TrackingPoint       → NEW append-only location telemetry history
+//   EmployeeTrackingState → NEW current-state row per tracked employee (live dashboard reads
+//                         THIS, never the history table)
+//   GeoFence            → NEW reusable fence entity; Branch geofence fields remain as
+//                         backward-compatible defaults and are backfilled into GeoFence rows
+//   AttendancePolicy(+Assignment) → NEW dynamic policy engine, scope priority
+//                         EMPLOYEE > DEPARTMENT > BRANCH > ALL_EMPLOYEES, effective policy
+//                         always resolved server-side
+//   AttendanceProof     → NEW secure selfie evidence (private storage route, audited access)
+
+// ---------- Geo-Fence (requirements §19–§21) ----------
+model GeoFence {
+  id                 String                     @id @default(cuid())
+  vendorId           String
+  name               String
+  branchId           String? // optional anchor branch (informational + assignment convenience)
+  type               String                     @default("CIRCLE") // CIRCLE (geometryJson designed so POLYGON can be added later)
+  latitude           Float
+  longitude          Float
+  radiusM            Float                      @default(150)
+  geometryJson       String                     @default("{}") // future polygon geometries; CIRCLE uses lat/lng/radiusM
+  startTime          String? // HH:MM fence-local validity window (null = all day)
+  endTime            String?
+  active             Boolean                    @default(true)
+  // provenance flag for fences auto-created from legacy Branch geofence fields
+  migratedFromBranch Boolean                    @default(false)
+  policies           AttendancePolicyGeoFence[]
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  @@index([vendorId, active])
+  @@index([vendorId, branchId])
+}
+
+// ---------- Dynamic attendance/tracking policy engine (§6–§7, §18, §29) ----------
+model AttendancePolicy {
+  id          String                       @id @default(cuid())
+  vendorId    String
+  name        String
+  // TRACKING (live location + update interval + battery/GPS monitoring)
+  // MANDATORY_GPS (GPS must stay on inside schedule; violations recorded)
+  // MULTIPLE_CHECKIN (periodic re-verification check-ins)
+  // ATTENDANCE_METHOD (which check-in methods are allowed: GEOFENCE / SELFIE / GEOFENCE_SELFIE / DEVICE_PUNCH)
+  policyType  String
+  priority    Int                          @default(0) // deterministic tie-break inside one scope level (higher wins)
+  // schedule (server-clock authoritative — never the employee device clock)
+  startDate   String? // ISO date the policy becomes valid (null = immediately)
+  endDate     String? // ISO date the policy expires (null = no end)
+  startTime   String? // HH:MM daily window start (null = all day)
+  endTime     String?
+  daysOfWeek  String                       @default("SUNDAY,MONDAY,TUESDAY,WEDNESDAY,THURSDAY") // comma list (Asia/Dhaka weekdays)
+  timezone    String                       @default("Asia/Dhaka")
+  active      Boolean                      @default(true)
+  // typed per-policy-type configuration. Keys are validated server-side
+  // (trackingPolicyConfig / multipleCheckinConfig zod schemas in validation.ts):
+  //   TRACKING:        { updateIntervalSec, maxAccuracyM, lowBatteryThreshold, criticalBatteryThreshold, offlineAfterMinutes, suspiciousAction }
+  //   MANDATORY_GPS:   { graceMinutes }
+  //   MULTIPLE_CHECKIN:{ minIntervalMinutes, maxPerDay, methods[] }
+  //   ATTENDANCE_METHOD:{ methods[], selfieRequired, requireGeofence }
+  configJson  String                       @default("{}")
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+  assignments AttendancePolicyAssignment[]
+  fences      AttendancePolicyGeoFence[]
+
+  @@index([vendorId, policyType, active])
+}
+
+// Scope-based assignment. Effective policy resolution order (§6):
+// EMPLOYEE > DEPARTMENT > BRANCH > ALL_EMPLOYEES, computed server-side.
+model AttendancePolicyAssignment {
+  id        String           @id @default(cuid())
+  vendorId  String
+  policyId  String
+  scopeType String // ALL_EMPLOYEES | BRANCH | DEPARTMENT | EMPLOYEE
+  scopeId   String? // branch/department/employee id (null for ALL_EMPLOYEES)
+  createdBy String?
+  createdAt DateTime         @default(now())
+  policy    AttendancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, scopeType, scopeId])
+  @@index([vendorId, policyId])
+}
+
+// Policy ↔ GeoFence many-to-many (§21): a policy can be valid for multiple
+// fences (e.g. Head Office + Client Site A); the server decides which fences
+// are currently in effect for an employee.
+model AttendancePolicyGeoFence {
+  id         String           @id @default(cuid())
+  vendorId   String
+  policyId   String
+  geoFenceId String
+  createdAt  DateTime         @default(now())
+  policy     AttendancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  geoFence   GeoFence         @relation(fields: [geoFenceId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, geoFenceId])
+  @@index([vendorId, geoFenceId])
+}
+
+// ---------- Immutable normalized attendance events (§4–§5) ----------
+model AttendanceEvent {
+  id                      String    @id @default(cuid())
+  vendorId                String
+  employeeId              String
+  eventType               String // CHECK_IN | CHECK_OUT | PERIODIC_CHECK_IN | PERIODIC_CHECK_OUT | PERIODIC_VERIFICATION | DEVICE_PUNCH | GPS_DISABLED | MANDATORY_GPS_VIOLATION | LOW_BATTERY | GEOFENCE_VIOLATION | SECURITY_FLAG
+  attendanceMethod        String // BIOMETRIC | GEOFENCE | SELFIE | GEOFENCE_SELFIE | DEVICE_PUNCH | MOBILE | ADMIN | WEB
+  source                  String    @default("WEB") // WEB | MOBILE | ZKTECO | ADMIN | SYSTEM
+  occurredAt              DateTime // server-determined event time (authoritative)
+  receivedAt              DateTime  @default(now())
+  clientTimestamp         String? // device wall clock at capture — forensic comparison only, never trusted
+  latitude                Float?
+  longitude               Float?
+  accuracyM               Float?
+  altitude                Float?
+  speed                   Float?
+  heading                 Float?
+  batteryPercentage       Int?
+  isCharging              Boolean?
+  gpsStatus               String? // OK | DISABLED | LOW_ACCURACY
+  networkStatus           String? // ONLINE | OFFLINE | WEAK
+  geoFenceId              String?
+  distanceFromGeoFenceM   Float?
+  locationIntegrityStatus String? // VERIFIED | SUSPICIOUS | MOCK_LOCATION | IMPOSSIBLE_MOVEMENT | STALE_LOCATION | LOW_ACCURACY | TIMESTAMP_ANOMALY | DEVICE_MISMATCH
+  deviceId                String? // mobile device identifier (binding: session vs registered device)
+  mobileSessionId         String?
+  selfieProofId           String?
+  attendanceId            String? // link to the daily Attendance summary row when the event drove check-in/out
+  policyId                String?
+  status                  String    @default("ACCEPTED") // VERIFIED | ACCEPTED | SUSPICIOUS | REVIEW_REQUIRED | REJECTED
+  reviewStatus            String    @default("NONE") // NONE | PENDING | APPROVED | REJECTED (admin review workflow for suspicious events)
+  reviewedBy              String?
+  reviewedAt              DateTime?
+  reason                  String?
+  flagsJson               String    @default("{}") // integrity signals, notes, decision inputs
+  clientEventId           String? // idempotency key supplied by the mobile client (§65)
+  rawEventId              String? // provenance: AttendanceRawEvent this was normalized from (§33)
+  createdAt               DateTime  @default(now())
+
+  @@unique([vendorId, clientEventId])
+  @@index([vendorId, employeeId, occurredAt])
+  @@index([vendorId, occurredAt])
+  @@index([vendorId, employeeId, eventType])
+  @@index([vendorId, status, reviewStatus])
+  @@index([vendorId, locationIntegrityStatus])
+}
+
+// ---------- Secure selfie proof (§26–§27) ----------
+// Private evidence storage: bytes live in `data` (base64) behind a dedicated
+// permission-gated view route — NEVER /public, never in list payloads, every
+// view/download is audit-logged. retentionUntil drives the retention sweeper.
+model AttendanceProof {
+  id                 String    @id @default(cuid())
+  vendorId           String
+  employeeId         String
+  attendanceEventId  String?
+  proofType          String    @default("SELFIE")
+  storageKey         String // logical key: proof/{vendorId}/{employeeId}/{id}
+  mimeType           String    @default("image/jpeg")
+  fileHash           String // sha-256 of the decoded bytes (tamper evidence)
+  byteSize           Int       @default(0)
+  data               String // base64 payload (private; only exposed via attendance.selfie.view)
+  capturedAt         DateTime
+  uploadedAt         DateTime  @default(now())
+  latitude           Float?
+  longitude          Float?
+  accuracyM          Float?
+  deviceId           String?
+  verificationStatus String    @default("EVIDENCE") // EVIDENCE (proof only — NOT identity verification, §27)
+  // Selfie Attendance G1 — capture provenance from the in-app camera
+  // ({score, method, faceDetected, faceRatio, brightness, sharpness, width,
+  //  height, bytesApprox}). EVIDENCE METADATA ONLY: it is shown to reviewers as
+  // context and NEVER flips verificationStatus (§27 — a selfie is proof of
+  // presence, not an identity check).
+  qualityJson        String    @default("{}")
+  retentionUntil     DateTime?
+  createdAt          DateTime  @default(now())
+
+  @@index([vendorId, employeeId, capturedAt])
+  @@index([vendorId, retentionUntil])
+}
+
+// ---------- Selfie-/tracking capture consent (§27–§28, Privacy & Consent) ----------
+// Audit round follow-up: the product had retention, private storage and a
+// strict-audited view path for selfie evidence, plus the M-16 tracking consent
+// gate, but NO explicit record of the employee ACKNOWLEDGING what a selfie
+// punch means. Rysenova advertises "Data Privacy & Consent Controls", and a
+// defensible consent record needs: the exact policy TEXT the employee agreed
+// to (hashed, so a later policy edit cannot retro-fit consent), the version,
+// when, from where and through which channel.
+//
+// Rules (deliberate, see SELFIE-ATTENDANCE-PLAN.md):
+//   - consent NEVER blocks attendance. A missing consent is surfaced to HR for
+//     follow-up; the punch still lands (an employee is never unpaid because a
+//     checkbox was missed).
+//   - consent rows are evidence of agreement, NOT telemetry: they are exempt
+//     from sweepProofRetention() so they outlive the selfie bytes they justify.
+//   - re-consent is a NEW row (a new version/text), never an overwrite — the
+//     prior agreement stays provable.
+model EmployeeConsent {
+  id         String    @id @default(cuid())
+  vendorId   String
+  employeeId String
+  purpose    String    @default("SELFIE_ATTENDANCE") // SELFIE_ATTENDANCE | TRACKING | BIOMETRIC
+  version    String // policy version the employee accepted (e.g. "2026-10-03.1")
+  textHash   String // sha-256 of the exact consent text shown (tamper evidence)
+  acceptedAt DateTime  @default(now())
+  source     String    @default("ESS_PORTAL") // ESS_PORTAL | ADMIN_IMPORT | PAPER_SCAN
+  ip         String?
+  userAgent  String?
+  revokedAt  DateTime?
+  revokedBy  String?
+  createdAt  DateTime  @default(now())
+
+  @@unique([vendorId, employeeId, purpose, version])
+  @@index([vendorId, employeeId, purpose])
+  @@index([vendorId, acceptedAt])
+}
+
+// ---------- Device binding (G2 — employee ↔ device enrollment) ----------
+// A mobile punch carries deviceId; the engine already raises the
+// DEVICE_MISMATCH location-integrity signal when the id changes during a day,
+// but there was no ENROLLMENT concept: no "register this phone", no device cap,
+// no admin revoke, and no way to make the binding actually block a punch.
+//
+// This model is that registry. Enforcement is policy-driven
+// (AttendanceMethod ATTENDANCE_METHOD config `deviceBinding`):
+//   OFF      — deviceId is recorded only (historical behaviour)
+//   ADVISORY — an unregistered/foreign device still punches, but the event is
+//              flagged DEVICE_MISMATCH for review (the existing lever)
+//   STRICT   — only an ACTIVE enrolled device may punch; anything else is 403
+//
+// `keyHash` is a server-issued enrolment secret (never the raw device id):
+// the device proves possession on later punches, so a cloned deviceId alone
+// cannot impersonate the enrolled phone.
+model EmployeeDevice {
+  id           String    @id @default(cuid())
+  vendorId     String
+  employeeId   String
+  deviceId     String // client-reported stable device identifier
+  label        String? // human label ("Pixel 7 — Rakib's phone")
+  platform     String? // ANDROID | IOS | WEB | UNKNOWN
+  userAgent    String?
+  keyHash      String? // sha-256 of the server-issued enrolment key (write-only)
+  status       String    @default("ACTIVE") // PENDING | ACTIVE | REVOKED
+  enrolledAt   DateTime  @default(now())
+  enrolledIp   String?
+  approvedBy   String? // admin user id for PENDING → ACTIVE
+  approvedAt   DateTime?
+  lastSeenAt   DateTime?
+  lastSeenIp   String?
+  revokedAt    DateTime?
+  revokedBy    String?
+  revokeReason String?
+  createdAt    DateTime  @default(now())
+
+  @@unique([vendorId, employeeId, deviceId])
+  @@index([vendorId, employeeId, status])
+  @@index([vendorId, deviceId])
+}
+
+
+// ---------- Location telemetry history (§10) ----------
+model TrackingPoint {
+  id                      String   @id @default(cuid())
+  vendorId                String
+  employeeId              String
+  deviceId                String?
+  timestamp               DateTime // server-received time (authoritative)
+  clientTimestamp         String? // device clock — forensic only
+  latitude                Float
+  longitude               Float
+  accuracyM               Float?
+  altitude                Float?
+  speed                   Float?
+  heading                 Float?
+  batteryPercentage       Int?
+  isCharging              Boolean?
+  gpsStatus               String?
+  networkStatus           String?
+  trackingSessionId       String?
+  locationIntegrityStatus String?
+  clientEventId           String? // idempotency (§65)
+  createdAt               DateTime @default(now())
+
+  @@unique([vendorId, clientEventId])
+  @@index([vendorId, employeeId, timestamp])
+  @@index([vendorId, timestamp])
+  @@index([deviceId, timestamp])
+}
+
+// ---------- Current tracking state (§9) — one row per tracked employee ----------
+model EmployeeTrackingState {
+  id                String    @id @default(cuid())
+  vendorId          String
+  employeeId        String    @unique
+  deviceId          String?
+  trackingEnabled   Boolean   @default(false) // admin toggle (tracking.start/stop)
+  trackingStatus    String    @default("OFFLINE") // TRACKING | GPS_DISABLED | LOW_ACCURACY | LOW_BATTERY | OFFLINE | OFFLINE_AFTER_LOW_BATTERY | POWER_OFF_UNCONFIRMED | OUTSIDE_GEOFENCE | SUSPICIOUS | NETWORK_LOST
+  lastSeenAt        DateTime?
+  latitude          Float?
+  longitude         Float?
+  accuracyM         Float?
+  batteryPercentage Int?
+  isCharging        Boolean?
+  gpsStatus         String?
+  networkStatus     String?
+  geoFenceId        String?
+  insideGeoFence    Boolean?
+  lastEventId       String?
+  lastPolicyId      String?
+  sessionStartedAt  DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  @@index([vendorId, trackingStatus])
+  @@index([vendorId, trackingEnabled])
+}
+
+// ============================ LEAVE ============================
+
+model LeaveType {
+  id                       String  @id @default(cuid())
+  vendorId                 String
+  code                     String
+  name                     String
+  paid                     Boolean @default(true)
+  defaultDays              Int     @default(10)
+  carryForward             Boolean @default(false)
+  maxCarryForward          Int     @default(0)
+  // HRM-011 — carry-forward & accrual depth (editable from Settings → Leave)
+  carryForwardExpiryMonths Int     @default(3)
+  accrualFrequency         String  @default("ANNUAL") // ANNUAL | MONTHLY | QUARTERLY | PRO_RATA
+  encashmentAllowed        Boolean @default(false)
+  // HRM-012 — encashment rules (rate × daily basic, capped)
+  encashmentRate           Float   @default(1) // multiple of daily gross
+  encashmentCap            Float   @default(0) // 0 = no cap (DAYS — LVE-006 unified both encashment paths)
+  waitingPeriodDays        Int     @default(0)
+  probationEligible        Boolean @default(false)
+  requiresAttachment       Boolean @default(false)
+  // LVE-107 — gender-restricted eligibility (maternity → FEMALE, paternity →
+  // MALE under the Bangladesh Labour Act structure). null = no restriction.
+  genderRestriction        String?
+  // LVE-113 (R7) — consecutive-day cap (BD norms: casual leave is capped at a
+  // few consecutive days at a time). 0 = no cap. Enforced on apply against
+  // the request window EXTENDED by adjacent approved/pending leave of the
+  // same type.
+  maxConsecutiveDays       Int     @default(0)
+  active                   Boolean @default(true)
+
+  @@unique([vendorId, code])
+}
+
+model LeaveBalance {
+  id             String @id @default(cuid())
+  vendorId       String
+  employeeId     String
+  leaveTypeId    String
+  year           Int
+  entitled       Float  @default(0)
+  used           Float  @default(0)
+  pending        Float  @default(0)
+  carriedForward Float  @default(0)
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([vendorId, year])
+}
+
+model LeaveRequest {
+  id                   String    @id @default(cuid())
+  vendorId             String
+  employeeId           String
+  leaveTypeId          String
+  fromDate             String
+  toDate               String
+  days                 Float
+  reason               String?
+  halfDay              Boolean   @default(false)
+  attachmentName       String?
+  attachmentData       String?
+  substituteEmployeeId String?
+  substituteStatus     String? // PENDING | ACCEPTED | DECLINED
+  substituteComment    String?
+  contactNumber        String? // reachable phone during leave (spec §8.1)
+  status               String    @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED | WITHDRAWN
+  approvalRequestId    String?
+  actedBy              String?
+  actedAt              DateTime?
+  createdAt            DateTime  @default(now())
+  // H-10 — leave history is Restrict: an employee with leave records cannot be
+  // hard-deleted at the DB layer (the app archives instead).
+  employee             Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([vendorId, id]) // H-10 — structural tenant scoping
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+}
+
+// ============================ COMPENSATION & PAYROLL ============================
+
+model SalaryStructure {
+  id                   String   @id @default(cuid())
+  vendorId             String
+  employeeId           String
+  effectiveFrom        String
+  effectiveTo          String? // null = current
+  basic                Float    @default(0)
+  houseRent            Float    @default(0)
+  medical              Float    @default(0)
+  conveyance           Float    @default(0)
+  food                 Float    @default(0)
+  mobileAllow          Float    @default(0)
+  internetAllow        Float    @default(0)
+  attendanceAllow      Float    @default(0)
+  otherAllowance       Float    @default(0)
+  gross                Float    @default(0)
+  // H-09 step 1 — staged paisa migration: integer duplicates alongside the
+  // Float columns (kept in sync by the engine + backfilled). Float columns are
+  // dropped in a later release once all consumers are confirmed migrated.
+  // 2026-10-13 — widened Int → BigInt: a payroll total in paisa crossed the
+  // INT4 ceiling (2,147,483,647) once gross exceeded ~Tk 21.47M (e.g.
+  // totalGrossPaisa = 5,003,650,000 threw "Unable to fit integer value into an
+  // INT4"). All paisa shadow columns are now BIGINT (see migration 9_wave6).
+  basicPaisa           BigInt? // = ROUND(basic * 100)
+  houseRentPaisa       BigInt?
+  medicalPaisa         BigInt?
+  conveyancePaisa      BigInt?
+  foodPaisa            BigInt?
+  mobileAllowPaisa     BigInt?
+  internetAllowPaisa   BigInt?
+  attendanceAllowPaisa BigInt?
+  otherAllowancePaisa  BigInt?
+  grossPaisa           BigInt?
+  componentsJson       String   @default("[]") // extra flexible components
+  revisionId           String?
+  status               String   @default("ACTIVE") // ACTIVE | SUPERSEDED | TERMINATED
+  createdBy            String?
+  createdAt            DateTime @default(now())
+
+  @@index([vendorId, employeeId])
+}
+
+model PayrollRun {
+  id                  String         @id @default(cuid())
+  vendorId            String
+  periodMonth         Int
+  periodYear          Int
+  periodWeek          Int            @default(0) // ISO week number for WEEKLY frequency (0 = monthly)
+  frequency           String         @default("MONTHLY")
+  runType             String         @default("REGULAR") // REGULAR | ADJUSTMENT
+  adjustRunId         String? // original run this adjusts
+  adjustSeq           Int            @default(0) // H-16 — sequence within (vendor, period, runType): 0 = the original run, 1..n = successive adjustment runs
+  cutoffDate          String?
+  processedDate       String?
+  paymentDate         String?
+  status              String         @default("DRAFT") // DRAFT | CALCULATED | HR_REVIEW | MANAGER_APPROVAL | ACCOUNTING_APPROVAL | APPROVED | PROCESSING | PAID | CANCELLED
+  totalGross          Float          @default(0)
+  totalOt             Float          @default(0)
+  totalBonus          Float          @default(0)
+  totalDeduction      Float          @default(0)
+  totalAit            Float          @default(0)
+  totalNet            Float          @default(0)
+  // H-09 step 1 — paisa duplicates of the run totals (integer, backfilled)
+  // 2026-10-13 — Int → BigInt (INT4 overflow on large payrolls, migration 9_wave6)
+  totalGrossPaisa     BigInt?
+  totalOtPaisa        BigInt?
+  totalBonusPaisa     BigInt?
+  totalDeductionPaisa BigInt?
+  totalAitPaisa       BigInt?
+  totalNetPaisa       BigInt?
+  employeeCount       Int            @default(0)
+  createdBy           String?
+  approvalRequestId   String?
+  journalId           String?
+  // ---- WP-F (2026-10-08) — payout confirmation leg (additive) ----
+  payoutConfirmedAt   DateTime? // salary disbursement confirmed → SALARY_PAYOUT journal
+  payoutJournalId     String?
+  cancelledAt         DateTime? // run cancelled after pay → PAYROLL_REVERSAL journal
+  // ---- WP-G (2026-10-08) — preflight auto-exclusion (additive) ----
+  excludedJson        String? // preflight BLOCKED employees excluded from generation [{id,code,name,reason}]
+  // MON-7 (Phase 4) — calculation claim fencing: bumped conditionally at the
+  // start of every calculateRun; the final rewrite only commits while the
+  // epoch still matches, so concurrent recalcs / racing submissions can
+  // never interleave writes.
+  calcEpoch           Int            @default(0)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  entries             PayrollEntry[]
+
+  @@unique([vendorId, periodYear, periodMonth, periodWeek, runType, adjustSeq])
+  @@unique([vendorId, id]) // H-10 — structural tenant scoping // H-16 — adjustSeq=0 keeps the old single-regular-run guarantee
+  @@index([vendorId, status])
+}
+
+model PayrollEntry {
+  id                    String     @id @default(cuid())
+  vendorId              String
+  runId                 String
+  employeeId            String
+  structureId           String?
+  presentDays           Float      @default(0)
+  absentDays            Float      @default(0)
+  lateMinutes           Int        @default(0)
+  otMinutes             Int        @default(0)
+  leaveDays             Float      @default(0)
+  gross                 Float      @default(0)
+  otAmount              Float      @default(0)
+  bonus                 Float      @default(0)
+  commission            Float      @default(0)
+  absenceDeduction      Float      @default(0)
+  lateDeduction         Float      @default(0)
+  loanDeduction         Float      @default(0)
+  advanceDeduction      Float      @default(0)
+  otherDeduction        Float      @default(0)
+  // 2026-10-14 — loan/advance installments recovered from THIS employee's
+  // salary as a GUARANTOR of an absent borrower (guarantor fallback, Payroll
+  // → Loan & Advance Control). Kept separate from loanDeduction (the
+  // guarantor's own loans) so payRun recovers the right borrower ledgers and
+  // payslips can itemise "Guarantor recovery — <borrower>" lines. The
+  // borrower-side detail (loanId/advanceId/installmentId/amount) rides in
+  // breakdownJson.guarantorRecoveries.
+  guarantorDeduction    Float      @default(0)
+  ait                   Float      @default(0)
+  net                   Float      @default(0)
+  // H-09 step 1 — paisa duplicates of every entry money field (integer,
+  // dual-written by calculateRun; backfilled for historical rows)
+  // 2026-10-13 — Int → BigInt (INT4 overflow guard, migration 9_wave6)
+  grossPaisa            BigInt?
+  otAmountPaisa         BigInt?
+  bonusPaisa            BigInt?
+  commissionPaisa       BigInt?
+  absenceDeductionPaisa BigInt?
+  lateDeductionPaisa    BigInt?
+  loanDeductionPaisa    BigInt?
+  advanceDeductionPaisa BigInt?
+  otherDeductionPaisa   BigInt?
+  guarantorDeductionPaisa BigInt?
+  aitPaisa              BigInt?
+  netPaisa              BigInt?
+  breakdownJson         String     @default("{}") // full component snapshot
+  taxRuleSetId          String?
+  payslipNumber         String?
+  emailStatus           String? // payslip email delivery outcome (SENT/FAILED/SKIPPED)
+  // R1 (2026-10-12) — payroll cancel/recreate support: exact record of the
+  // loan/advance recoveries applied by payRun for THIS entry, written at pay
+  // time and consumed by payroll.runs.cancel to revert ledgers precisely
+  // (no double-recovery when the month is re-paid). null = never paid.
+  recoveryJson          String?
+  // H-10 — money/history: employee relation Restrict
+  employee              Employee   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  status                String     @default("INCLUDED") // INCLUDED | EXCLUDED | ADJUSTED
+  adjustEntryId         String? // entry adjusted by adjustment run
+  journalId             String?
+  // H-10 — CHANGED from Cascade to Restrict (dedicated migration with change
+  // note): deleting a PayrollRun with entries is blocked; money history must
+  // never silently cascade away. Runs are cancelled/adjusted, not deleted.
+  run                   PayrollRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+
+  @@unique([runId, employeeId])
+  @@unique([vendorId, id]) // H-10 — structural tenant scoping
+  @@index([vendorId, employeeId])
+
+  // M-13 — payslip numbers are unique per vendor. Same-period adjustment runs
+  // carry an -A<seq> discriminator in the number itself; the migration
+  // renumbers historical duplicates (-Rn suffix) before creating the index.
+  @@unique([vendorId, payslipNumber])
+}
+
+model TaxRuleSet {
+  id               String   @id @default(cuid())
+  vendorId         String
+  name             String
+  financialYear    String // 2025-26
+  mode             String   @default("SLAB") // DIRECT | PERCENT | SLAB
+  directAmount     Float    @default(0)
+  percent          Float    @default(0)
+  taxableBase      String   @default("GROSS") // GROSS | BASIC | NET
+  taxFreeThreshold Float    @default(350000)
+  rebatePercent    Float    @default(0)
+  effectiveFrom    String?
+  notes            String?
+  source           String?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  @@index([vendorId])
+}
+
+model TaxSlab {
+  id        String @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from TaxRuleSet).
+  vendorId String
+  ruleSetId String
+  minIncome Float
+  maxIncome Float? // null = infinite
+  rate      Float // percent
+
+  @@unique([vendorId, ruleSetId, minIncome])
+  @@index([vendorId, ruleSetId])
+}
+
+// HRM-013 — BD tax rebates & exemptions (NBR-style: e.g. festival rebate,
+// medical expense, LFA, contribution to provident/welfare funds)
+model TaxExemption {
+  id        String   @id @default(cuid())
+  vendorId  String
+  name      String
+  type      String   @default("REBATE") // REBATE (percent of tax) | DEDUCTION (from taxable income) | FIXED (from tax)
+  maxAmount Float    @default(0) // 0 = uncapped
+  percent   Float    @default(0) // for REBATE: % of computed tax
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([vendorId])
+}
+
+// HRM-P1 — reusable salary structure templates (Settings → Payroll templates)
+model SalaryTemplate {
+  id              String   @id @default(cuid())
+  vendorId        String
+  name            String
+  description     String?
+  basic           Float    @default(0)
+  houseRent       Float    @default(0)
+  medical         Float    @default(0)
+  conveyance      Float    @default(0)
+  food            Float    @default(0)
+  mobileAllow     Float    @default(0)
+  internetAllow   Float    @default(0)
+  attendanceAllow Float    @default(0)
+  otherAllowance  Float    @default(0)
+  componentsJson  String   @default("[]") // extra flexible components
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@index([vendorId])
+}
+
+model Bonus {
+  id          String   @id @default(cuid())
+  vendorId    String
+  employeeId  String
+  type        String // FESTIVAL | PERFORMANCE | SALES_COMMISSION | TARGET | ATTENDANCE | REFERRAL | SPECIAL
+  calcType    String   @default("FIXED") // FIXED | PERCENT | FORMULA
+  amount      Float    @default(0)
+  percent     Float?
+  baseAmount  Float?
+  formula     String?
+  periodMonth Int?
+  periodYear  Int?
+  label       String?
+  status      String   @default("PENDING") // PENDING | APPROVED | IN_PAYROLL | PAID | REJECTED
+  runId       String?
+  createdBy   String? // M-6 — separation of duties: creator can never approve their own bonus
+  approvedBy  String?
+  createdAt   DateTime @default(now())
+
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+}
+
+model Deduction {
+  id         String   @id @default(cuid())
+  vendorId   String
+  employeeId String
+  type       String // ABSENCE | LATE | ADVANCE | LOAN | AIT | OTHER
+  label      String
+  amount     Float
+  month      Int
+  year       Int
+  recurring  Boolean  @default(false)
+  status     String   @default("ACTIVE") // ACTIVE | IN_PAYROLL | PAID | STOPPED
+  createdAt  DateTime @default(now())
+
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+}
+
+// ============================ FINANCIAL HR ============================
+
+model Loan {
+  id                   String    @id @default(cuid())
+  vendorId             String
+  employeeId           String
+  type                 String    @default("PERSONAL") // PERSONAL | HOUSING | MEDICAL | EMERGENCY | OTHER
+  principal            Float
+  interestRate         Float     @default(0)
+  installmentAmount    Float     @default(0)
+  installments         Int       @default(1)
+  startDate            String
+  endDate              String?
+  paidAmount           Float     @default(0)
+  outstanding          Float     @default(0)
+  status               String    @default("PENDING") // PENDING | APPROVED | REJECTED | ACTIVE | CLOSED
+  purpose              String?
+  // Guarantor consent flow (spec §10.1): requester names a colleague as guarantor;
+  // the loan enters the approval workflow only after the guarantor agrees.
+  guarantorId          String?
+  guarantorStatus      String? // null = none | PENDING | AGREED | DECLINED
+  guarantorRespondedAt DateTime?
+  guarantorNote        String?
+  journalDisburseId    String?
+  approvalRequestId    String?
+  // H-10 — money table: Restrict (loan history pins the employee row).
+  employee             Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  approvedBy           String?
+  actedAt              DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@unique([vendorId, id]) // H-10 — structural tenant scoping
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+  @@index([vendorId, guarantorId, guarantorStatus])
+}
+
+model LoanInstallment {
+  id             String    @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from Loan).
+  vendorId String
+  loanId         String
+  no             Int
+  dueDate        String
+  amount         Float
+  paidAmount     Float     @default(0)
+  payrollEntryId String?
+  paidAt         DateTime?
+  status         String    @default("PENDING") // PENDING | PAID | PARTIAL | OVERDUE
+
+  @@unique([vendorId, loanId, no])
+  @@index([vendorId, loanId])
+}
+
+model Advance {
+  id                String    @id @default(cuid())
+  vendorId          String
+  employeeId        String
+  amount            Float
+  reason            String?
+  requestDate       String
+  recoveryDate      String?
+  installments      Int       @default(1)
+  deducted          Float     @default(0)
+  outstanding       Float     @default(0)
+  status            String    @default("PENDING") // PENDING | APPROVED | REJECTED | RECOVERING | RECOVERED
+  approvalRequestId String?
+  approvedBy        String?
+  actedAt           DateTime?
+  journalId         String?
+  // 2026-10-14 — guarantor fallback for salary advances: when the borrower
+  // has no payable salary in a period (absent the whole period / off the
+  // payroll), the monthly recovery deducts from this designated colleague's
+  // salary instead (Payroll → Loan & Advance Control). Advances are created
+  // by HR, so the guarantor designation takes effect immediately (loans keep
+  // their ESS consent flow — spec §10.1).
+  guarantorId       String?
+  guarantorStatus   String? // null = none | AGREED (HR-designated)
+  createdAt         DateTime  @default(now())
+
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+  @@index([vendorId, guarantorId, guarantorStatus])
+}
+
+model ExpenseClaim {
+  id                String    @id @default(cuid())
+  vendorId          String
+  employeeId        String
+  category          String // TRAVEL | FOOD | MEDICAL | OFFICE | TRANSPORT | CLIENT | OTHER
+  title             String
+  amount            Float
+  approvedAmount    Float?
+  date              String
+  description       String?
+  branchId          String?
+  projectRef        String?
+  receiptName       String?
+  receiptData       String?
+  paymentMethod     String    @default("BANK")
+  status            String    @default("PENDING") // PENDING | APPROVED | REJECTED | REIMBURSED
+  reimbursementDate String?
+  approvalRequestId String?
+  approvedBy        String?
+  actedAt           DateTime?
+  journalId         String?
+  createdAt         DateTime  @default(now())
+
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+}
+
+// Accounting integration (journal entries posted into ERP chart of accounts)
+model AccountJournal {
+  id             String   @id @default(cuid())
+  vendorId       String
+  refType        String // PAYROLL | LOAN_DISBURSE | LOAN_RECOVERY | ADVANCE_PAY | ADVANCE_RECOVER | EXPENSE | SETTLEMENT | AIT | JOURNAL_VOUCHER
+  refId          String?
+  idempotencyKey String?  @unique // H-3 — money-path backstop: one posting per business event
+  date           String
+  memo           String
+  linesJson      String // [{account, accountName, debit, credit}]
+  amount         Float
+  source         String   @default("HRM")
+  // ---- Wave 3 WP-B (2026-10-08) — manual voucher approval workflow ----
+  // POSTED default keeps every auto-generated journal (payroll/loans/expenses)
+  // and all pre-existing rows untouched; only MANUAL vouchers ever carry
+  // DRAFT/PENDING_APPROVAL/REJECTED. Posted money history stays immutable.
+  status         String   @default("POSTED") // DRAFT | PENDING_APPROVAL | POSTED | REJECTED
+  approvedById   String?
+  approvedByName String?
+  approvedAt     DateTime?
+  rejectionReason String?
+  // ---- Wave 4 WP-B (2026-10-08) — optional cost-center tag (manual vouchers)
+  costCenterId   String?
+  createdAt      DateTime @default(now())
+
+  @@index([vendorId, refType])
+  @@index([vendorId, date])
+  @@index([vendorId, status])
+  @@index([vendorId, costCenterId])
+}
+
+// ============================ PERFORMANCE / KPI / TASKS ============================
+
+model ReviewCycle {
+  id        String   @id @default(cuid())
+  vendorId  String
+  name      String // 2026 Annual Performance Review
+  year      Int
+  startDate String
+  endDate   String
+  status    String   @default("ACTIVE") // DRAFT | ACTIVE | CLOSED
+  createdAt DateTime @default(now())
+
+  @@index([vendorId])
+}
+
+model PerformanceReview {
+  id               String    @id @default(cuid())
+  vendorId         String
+  cycleId          String
+  employeeId       String
+  reviewerId       String?
+  ratingsJson      String    @default("{}") // {attendance:4,...}
+  // PRF-01 (R7) — multi-reviewer input: { self: { ratings, comments,
+  // submittedAt }, peers: [{ name, ratings, comments, recordedAt }] }. The
+  // manager's own ratings stay in ratingsJson (zero change to existing
+  // consumers); self/peer panels are additive.
+  inputsJson       String    @default("{}")
+  overallRating    Float     @default(0)
+  managerComments  String?
+  employeeComments String?
+  strengths        String?
+  weaknesses       String?
+  goals            String?
+  improvementPlan  String?
+  status           String    @default("DRAFT") // DRAFT | SUBMITTED | ACKNOWLEDGED | FINAL
+  submittedAt      DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([cycleId, employeeId])
+  @@index([vendorId, employeeId])
+}
+
+model KpiTemplate {
+  id            String   @id @default(cuid())
+  vendorId      String
+  name          String
+  designationId String?
+  departmentId  String?
+  itemsJson     String   @default("[]") // [{name, target, unit, weight}]
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([vendorId])
+}
+
+model KpiAssignment {
+  id          String   @id @default(cuid())
+  vendorId    String
+  employeeId  String
+  templateId  String?
+  periodLabel String // 2026-Q3
+  dueDate     String?
+  status      String   @default("PENDING") // PENDING | IN_PROGRESS | SUBMITTED | REVIEWED
+  resultsJson String   @default("[]") // [{name, target, actual, achievementPct, weight, score, rating}]
+  createdAt   DateTime @default(now())
+
+  @@index([vendorId, employeeId])
+  @@index([vendorId, status])
+}
+
+model Task {
+  id             String   @id @default(cuid())
+  vendorId       String
+  title          String
+  description    String?
+  assigneeId     String
+  departmentId   String?
+  branchId       String?
+  scope          String   @default("EMPLOYEE") // EMPLOYEE | DEPARTMENT | HR | PAYROLL
+  priority       String   @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  startDate      String?
+  dueDate        String?
+  status         String   @default("TODO") // TODO | IN_PROGRESS | ON_HOLD | COMPLETED | CANCELLED
+  progress       Int      @default(0)
+  checklistJson  String   @default("[]") // [{text, done}]
+  attachmentName String?
+  commentsJson   String   @default("[]") // [{userId, userName, text, at}]
+  createdBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([vendorId, assigneeId])
+  @@index([vendorId, status])
+}
+
+// ============================ HR LETTERS ============================
+
+model LetterTemplate {
+  id                   String   @id @default(cuid())
+  vendorId             String
+  type                 String // APPOINTMENT | CONFIRMATION | PROBATION_EXT | SALARY_CERT | EMPLOYMENT_CERT | EXPERIENCE | INCREMENT | PROMOTION | TRANSFER | WARNING | APPRECIATION | SHOW_CAUSE | SUSPENSION | TERMINATION | RESIGN_ACCEPT | RELEASE | RELIEVING | NOC | CUSTOM
+  name                 String
+  subject              String
+  body                 String // with {{variables}}
+  signatoryName        String?
+  signatoryDesignation String?
+  requiresApproval     Boolean  @default(true)
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([vendorId, type])
+}
+
+model HrLetter {
+  id                String    @id @default(cuid())
+  vendorId          String
+  employeeId        String
+  type              String
+  templateId        String?
+  letterNumber      String
+  subject           String
+  content           String // rendered snapshot
+  signatoryName     String?
+  status            String    @default("DRAFT") // DRAFT | PREPARED | HR_REVIEW | MANAGEMENT_APPROVAL | APPROVED | ISSUED | REJECTED
+  issuedAt          DateTime?
+  approvedBy        String? // user who gave the final approval (spec §13.5 issuance history)
+  deliveryMethod    String? // PORTAL | EMAIL | PRINT
+  // LTR-02 (R7) — anti-forgery verification code (HMAC-derived at issue,
+  // stored on the row, printed on the letter; third parties verify via the
+  // public /api/verify/letter endpoint). Stable across key rotation because
+  // verification compares the SUBMITTED code against this stored value.
+  verificationCode  String?
+  emailStatus       String?
+  downloadCount     Int       @default(0)
+  dataJson          String    @default("{}")
+  approvalRequestId String?
+  createdBy         String?
+  createdAt         DateTime  @default(now())
+
+  @@unique([vendorId, letterNumber])
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+  @@index([vendorId, verificationCode])
+}
+
+// ============================ RESIGNATION & EXIT ============================
+
+model Resignation {
+  id                String    @id @default(cuid())
+  vendorId          String
+  employeeId        String
+  submissionDate    String
+  resignationDate   String
+  proposedLwd       String
+  actualLwd         String?
+  reason            String
+  remarks           String?
+  letterName        String?
+  letterData        String?
+  status            String    @default("SUBMITTED") // DRAFT | SUBMITTED | UNDER_REVIEW | MANAGER_APPROVED | HR_REVIEW | MANAGEMENT_REVIEW | ACCEPTED | REJECTED | WITHDRAWN | NOTICE_PERIOD | COMPLETED
+  acceptedAt        DateTime?
+  withdrawnAt       DateTime?
+  withdrawStage     String?
+  noticeMode        String    @default("FULL") // FULL | SHORT | WAIVED | BUYOUT | EARLY_RELEASE
+  noticeDays        Int       @default(30)
+  servedDays        Int       @default(0)
+  approvalRequestId String?
+  actedBy           String?
+  actedAt           DateTime?
+  // HRM-018 — access/status closure workflow on exit
+  closureStatus     String    @default("PENDING") // PENDING | SCHEDULED | DONE
+  closureDoneAt     DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+}
+
+// HRM P2 & Commission Rule Setup — comprehensive commission rule engine (Payroll → Bonuses & Commission)
+model CommissionRule {
+  id                    String    @id @default(cuid())
+  vendorId              String
+  name                  String
+  calculationPeriod     String    @default("MONTHLY") // MONTHLY | QUARTERLY | HALF_YEARLY | YEARLY
+  effectiveFrom         DateTime  @default(now())
+  effectiveTo           DateTime? // null = open-ended
+  active                Boolean   @default(true)
+  status                String    @default("ACTIVE") // DRAFT | PENDING_APPROVAL | ACTIVE | INACTIVE | REJECTED
+
+  // Calculation Basis & Method
+  basis                 String    @default("PERCENT_OF_SALES") // PERCENT_OF_SALES | FLAT
+  percentMethod         String?   // TOTAL_REVENUE | REVENUE_EXCEEDING_TARGET
+  flatMethod            String?   // PER_EMPLOYEE | TOTAL_POOL
+  rate                  Float     @default(0) // % of sales (0-100) or flat amount in BDT
+  distributionMethod    String?   // EQUAL | SALARY_PRO_RATA
+
+  // Eligibility Criteria & Target Flags
+  minServicePeriodValue Int       @default(0)
+  minServicePeriodUnit  String    @default("MONTHS") // DAYS | MONTHS | YEARS
+  requireTotalTarget    Boolean   @default(false)
+  requireBranchTarget   Boolean   @default(false)
+  requireDeptTarget     Boolean   @default(false)
+  requireEmpTarget      Boolean   @default(false)
+
+  // Cap
+  cap                   Float     @default(0) // Total rule commission cap (0 = uncapped)
+
+  // Eligible Employee Statuses (JSON string[] — default covers active workforce)
+  eligibleStatuses      String    @default("[\"ACTIVE\",\"PROBATION\"]") // JSON array of Employee.status values
+
+  // Scope (optional overrides)
+  branchId              String?   // null = all branches
+  departmentId          String?   // null = all departments
+  designationId         String?   // null = all designations
+  minSales              Float     @default(0) // backward-compatible legacy minimum sales
+
+  // Audit & Workflow
+  approvalRequestId     String?
+  createdBy             String?
+  approvedBy            String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  thresholds            CommissionThreshold[]
+  thresholdImports      CommissionThresholdImport[]
+
+  @@index([vendorId])
+  @@index([vendorId, active])
+  @@index([vendorId, calculationPeriod])
+}
+
+model CommissionThreshold {
+  id            String    @id @default(cuid())
+  vendorId      String
+  ruleId        String
+  targetType    String    // TOTAL | BRANCH | DEPARTMENT | EMPLOYEE
+  targetId      String?   // null for TOTAL, branchId for BRANCH, departmentId for DEPT, employeeId for EMP
+  targetName    String?   // Denormalized name for display / audit
+  thresholdAmount Float   @default(0) // Minimum target revenue in BDT
+  status        String    @default("APPROVED") // APPROVED | PENDING_APPROVAL | REJECTED
+  importId      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  rule          CommissionRule             @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  importBatch   CommissionThresholdImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+
+  @@index([vendorId, ruleId])
+  @@index([ruleId, targetType, targetId])
+  @@index([vendorId, status])
+}
+
+model CommissionThresholdImport {
+  id                String    @id @default(cuid())
+  vendorId          String
+  ruleId            String
+  fileName          String
+  totalRows         Int       @default(0)
+  validRows         Int       @default(0)
+  invalidRows       Int       @default(0)
+  rowsJson          String    @default("[]") // Parsed rows with validation status and error messages
+  status            String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvalRequestId String?
+  uploadedBy        String
+  approvedBy        String?
+  actedAt           DateTime?
+  rejectionReason   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  rule              CommissionRule        @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  thresholds        CommissionThreshold[]
+
+  @@index([vendorId, ruleId])
+  @@index([vendorId, status])
+}
+
+model CommissionCalculationLog {
+  id                    String    @id @default(cuid())
+  vendorId              String
+  ruleId                String
+  ruleName              String
+  ruleVersion           Int       @default(1)
+  periodMonth           Int?
+  periodYear            Int
+  calculationPeriod     String    // MONTHLY | QUARTERLY | HALF_YEARLY | YEARLY
+  employeeId            String
+  employeeName          String
+  employeeCode          String?
+  eligibleRevenue       Float     @default(0)
+  targetRevenue         Float     @default(0)
+  targetTypeApplied     String?   // COMPANY | BRANCH | DEPARTMENT | EMPLOYEE | NONE
+  basis                 String
+  calculationMethod     String
+  rate                  Float     @default(0)
+  distributionMethod    String?
+  baseCalculatedAmount  Float     @default(0)
+  capApplied            Boolean   @default(false)
+  capAmount             Float?
+  finalCommissionAmount Float     @default(0)
+  bonusId               String?   // Linked Bonus record ID
+  payrollEntryId        String?
+  calculatedBy          String
+  createdAt             DateTime  @default(now())
+
+  @@index([vendorId, ruleId])
+  @@index([vendorId, employeeId, periodYear, periodMonth])
+  @@index([vendorId, bonusId])
+}
+
+model ExitClearance {
+  id            String    @id @default(cuid())
+  vendorId      String
+  resignationId String
+  checklistJson String    @default("[]") // [{department, item, cleared, clearedBy, notes}]
+  status        String    @default("PENDING") // PENDING | IN_PROGRESS | CLEARED
+  clearedAt     DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  @@index([vendorId])
+}
+
+model FinalSettlement {
+  id              String    @id @default(cuid())
+  vendorId        String
+  resignationId   String
+  computationJson String    @default("{}") // {finalSalary, ot, bonus, leaveEncashment, loanDue, advanceDue, otherDeductions, netPayable}
+  netPayable      Float     @default(0)
+  status          String    @default("DRAFT") // DRAFT | CALCULATED | APPROVED | PAID
+  approvedBy      String?
+  paidAt          DateTime?
+  journalId       String?
+  createdAt       DateTime  @default(now())
+
+  @@index([vendorId])
+}
+
+// ============================ ANNOUNCEMENTS ============================
+
+model Announcement {
+  id           String    @id @default(cuid())
+  vendorId     String
+  title        String
+  body         String
+  audienceType String    @default("ALL") // ALL | BRANCH | DEPARTMENT | DESIGNATION | SPECIFIC
+  audienceIds  String    @default("[]") // JSON
+  pinned       Boolean   @default(false)
+  publishedAt  DateTime?
+  active       Boolean   @default(true)
+  createdBy    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([vendorId, active])
+}
+
+// COM-02 (R7) — announcement read receipts: one row per (announcement,
+// reader). Powers per-notice read stats for HR ("12 of 40 have read this")
+// and the honest "mark as read" surface for employees.
+model AnnouncementRead {
+  id             String   @id @default(cuid())
+  vendorId       String
+  announcementId String
+  userId         String
+  readAt         DateTime @default(now())
+
+  @@unique([vendorId, announcementId, userId])
+  @@index([vendorId, announcementId])
+}
+
+// LTR-01 (R7) — employee-initiated letter requests (salary certificates,
+// experience letters, NOC...). HR approves → a letter is generated from the
+// active template (normal letters.generate flow) and linked back; or rejects
+// with a note. Employees see their own requests + status in ESS.
+model LetterRequest {
+  id           String    @id @default(cuid())
+  vendorId     String
+  employeeId   String
+  requestedBy  String // User id
+  type         String // LETTER_TYPES vocabulary (SALARY_CERT | EXPERIENCE | NOC | EMPLOYMENT_CERT | ...)
+  reason       String?
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED | FULFILLED
+  decidedBy    String?
+  decidedAt    DateTime?
+  decisionNote String?
+  letterId     String? // the generated HrLetter once fulfilled
+  createdAt    DateTime  @default(now())
+
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+}
+
+// ============================ COMMUNICATION CENTER (email & SMS blasts) ============================
+
+model CommunicationLog {
+  id             String   @id @default(cuid())
+  vendorId       String
+  channel        String // EMAIL | SMS | BOTH
+  subject        String?
+  message        String
+  audienceType   String   @default("ALL") // ALL | BRANCH | DEPARTMENT | DESIGNATION | SPECIFIC
+  audienceLabel  String?
+  recipientCount Int      @default(0)
+  deliveredCount Int      @default(0)
+  failedCount    Int      @default(0)
+  skippedCount   Int      @default(0) // gateway not configured / missing address
+  status         String   @default("SENT") // SENT | PARTIAL | FAILED
+  inAppNotified  Boolean  @default(false)
+  sentBy         String?
+  sentByName     String?
+  createdAt      DateTime @default(now())
+
+  @@index([vendorId, createdAt])
+}
+
+model CommunicationRecipient {
+  id           String  @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from CommunicationLog).
+  vendorId String
+  logId        String
+  employeeId   String
+  employeeName String?
+  email        String?
+  phone        String?
+  emailStatus  String? // SENT | FAILED | SKIPPED | NA
+  smsStatus    String? // SENT | FAILED | SKIPPED | NA
+  detail       String?
+
+  @@index([vendorId, logId])
+}
+
+// ================= REMEDIATION — supporting models =================
+
+// M-22 — race-safe sequential code generation. Count+1 code generation collides
+// under concurrent creates (letters, org units); this counter table makes the
+// increment atomic at the database level (UPDATE ... RETURNING semantics).
+model SequenceCounter {
+  key   String @id // e.g. "<vendorId>:letters" — scoped, stable keys
+  value Int    @default(0)
+}
+
+// Approval delegation (audit §L — missing feature): a user temporarily
+// delegates their approval authority to another user for a date window.
+// The engine honors ACTIVE delegations in canActOnStep and stamps the action.
+model ApprovalDelegate {
+  id         String   @id @default(cuid())
+  vendorId   String
+  fromUserId String
+  toUserId   String
+  startDate  String
+  endDate    String
+  reason     String?
+  active     Boolean  @default(true)
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  @@index([vendorId, toUserId, active])
+  @@index([vendorId, fromUserId])
+}
+
+// ================= PROVIDENT FUND (PF) =================
+// Additive module: vendor-level rules live in HrSettings group "pf";
+// per-employee enrollment + contribution ledger live here. The payroll engine
+// computes the employee deduction (payroll.ts calculateRun) and rows are
+// written when the run is PAID (payRun transaction) — same money-path
+// discipline as loans/advances.
+
+// Employee PF enrollment (one row per employee per vendor).
+model PfEnrollment {
+  id          String    @id @default(cuid())
+  vendorId    String
+  employeeId  String
+  enrollDate  String // ISO date
+  status      String    @default("ACTIVE") // ACTIVE | PAUSED | CLOSED
+  employeePct Float     @default(10) // % of basis withheld from the employee
+  employerPct Float     @default(10) // % of basis contributed by the employer
+  basis       String    @default("BASIC") // BASIC | GROSS — inherited default, may override config
+  note        String?
+  closedAt    DateTime?
+  createdBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([vendorId, employeeId])
+  @@index([vendorId, status])
+}
+
+// Immutable contribution ledger — appended by payroll payment, manual entry
+// or opening balance import. Balance = Σ employeeAmount + employerAmount.
+model PfContribution {
+  id             String   @id @default(cuid())
+  vendorId       String
+  employeeId     String
+  periodYear     Int
+  periodMonth    Int
+  employeeAmount Float    @default(0)
+  employerAmount Float    @default(0)
+  source         String   @default("PAYROLL") // PAYROLL | MANUAL | OPENING | WITHDRAWAL
+  runId          String? // PayrollRun that generated this row (PAYROLL only)
+  note           String?
+  // MON-3 (Phase 1) — sha256(note), with the creating run folded in for
+  // PAYROLL rows; the component that makes the below unique key work with
+  // NULL-able notes (Postgres treats NULLs as distinct, so a plain note
+  // column could never back a unique constraint). Computed at every write
+  // site via pfNoteHash(); backfilled by the 9_wave9zc_pf_contribution_dedupe_unique_20261021 migration.
+  noteHash       String   @default("")
+  createdBy      String?
+  createdAt      DateTime @default(now())
+
+  @@index([vendorId, employeeId, periodYear, periodMonth])
+  @@index([vendorId, runId])
+  // MON-3 — import idempotency: a retried/double-uploaded row is the SAME row.
+  @@unique([vendorId, employeeId, periodYear, periodMonth, source, noteHash])
+}
+
+// ================= AIT / INCOME TAX — Income Tax Act 2023 =================
+// Fully configuration-driven engine: NOTHING about rates, thresholds, slabs,
+// exemptions, minimum tax or rebate percentages is hardcoded. Every number
+// lives in these per-fiscal-year tables so a new Finance Act year is a
+// configuration change, never a code change.
+//
+// Legal anchors: Sec 86 (TDS on salary), Sec 32 + Third Schedule (salary
+// definition & exemption), First Schedule Part A (slab rates), Sec 164
+// (minimum tax), Sec 78 (investment rebate), Sec 166 (statement/reconciliation).
+
+// One row per fiscal year per vendor. Only ONE may be active at a time.
+model AitFiscalYear {
+  id                 String                @id @default(cuid())
+  vendorId           String
+  label              String // "FY 2025-26"
+  incomeYear         String // "2025-26" (year the income is earned)
+  assessmentYear     String // "2026-27" (year the return is filed)
+  tdsSectionRef      String                @default("Section 86, Income Tax Act 2023")
+  // Salary exemption rule (Third Schedule): exempt = MIN(annualGross × fraction, cap)
+  exemptionFraction  Float                 @default(0.3333333333) // 1/3
+  exemptionCap       Float                 @default(500000)
+  // Minimum tax (Sec 164) — WARNING ONLY, never auto-inflates TDS
+  minimumTax         Float                 @default(5000)
+  // Investment rebate (Sec 78, ITA 2023 as consolidated June 2025): rebate =
+  // LOWER OF (a) rebateIncomeCapPercent% of taxable income [A base], (b)
+  // rebateRatePercent% of eligible investment [B], (c) rebateCapAmount (absolute).
+  // r8 audit (2026-10-14): previously implemented as 15% x MIN(investment,
+  // 25% of taxable, 1 crore) — legally wrong in all three limbs.
+  rebateRatePercent      Float                 @default(15)
+  rebateCapFraction      Float                 @default(0.25) // LEGACY pre-r8 — kept for audit trail, NOT used by the engine
+  rebateCapAmount        Float                 @default(10000000)
+  rebateIncomeCapPercent Float                 @default(3) // §78(a) — 3% of taxable income cap
+  newTaxpayerMinimumTax  Float?                // ৳1,000 floor for first-time return filers (AY 2026-27+); null = N/A
+  surchargeJson          String?               // net-wealth surcharge bands per year (FO 2025 / FA 2026); null = engine default table
+  // Festival bonus default for annual projection: N × monthly basic
+  festivalBonusCount Float                 @default(2)
+  active             Boolean               @default(false)
+  notes              String?
+  createdBy          String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  categories         AitTaxpayerCategory[]
+  slabs              AitTaxSlab[]
+
+  @@index([vendorId, active])
+}
+
+// Taxpayer-category thresholds (First Schedule, Finance Ordinance 2025).
+// Category labels are free-form — the engine matches by key.
+model AitTaxpayerCategory {
+  id           String        @id @default(cuid())
+  vendorId     String
+  fiscalYearId String
+  key          String // general | female | senior | disabled | freedom_fighter | …
+  label        String // display label (bilingual-friendly)
+  threshold    Float // tax-free threshold for this category
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  fiscalYear   AitFiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+
+  @@unique([fiscalYearId, key])
+}
+
+// Ordered cumulative progressive slabs. `upperLimit` null = balance (no cap).
+// The engine loops ANY number of slabs in `order` — never assumes a count.
+model AitTaxSlab {
+  id           String        @id @default(cuid())
+  vendorId     String
+  fiscalYearId String
+  order        Int // 1..N
+  slabLabel    String // "First ৳3,00,000"
+  upperLimit   Float? // width of this slab band; null = remaining balance
+  ratePercent  Float // 10 | 15 | 20 | 25 | 30 …
+  createdAt    DateTime      @default(now())
+  fiscalYear   AitFiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+
+  @@index([fiscalYearId, order])
+}
+
+// Immutable audit journal: every calculation (preview/save/batch/payroll)
+// records the FULL config snapshot + inputs + outputs. Payroll-finalized
+// rows are part of the money record and are never rewritten.
+model AitCalculationLog {
+  id           String   @id @default(cuid())
+  vendorId     String
+  fiscalYearId String?
+  employeeId   String?
+  employeeCode String?
+  employeeName String?
+  kind         String // PREVIEW | SAVE | BATCH | PAYROLL | RECONCILIATION
+  inputsJson   String // full input set
+  configJson   String // config snapshot used (thresholds/slabs/rates at calc time)
+  outputJson   String // full 14-line breakdown
+  warningsJson String   @default("[]")
+  runId        String? // PayrollRun link for PAYROLL rows
+  operatorId   String?
+  operatorName String?
+  createdAt    DateTime @default(now())
+
+  @@index([vendorId, createdAt])
+  @@index([vendorId, employeeId])
+  @@index([vendorId, runId])
+}
+
+// ================= PASSWORD RESET (login recovery) =================
+// Single-use, hashed-at-rest tokens. The raw token only ever exists in the
+// reset link handed to the user (email) — the DB keeps sha256(token+salt).
+// HIGH-3 (this audit) — the PasswordResetToken model was declared but never
+// queried (grep db.passwordResetToken src/ → 0 hits). The reset flow lives on
+// the User.passwordResetToken String field instead (auth.ts:159-233).
+//
+// Decision: rather than carry dead code with intended-but-unused audit
+// features, we drop the model. If a future audit cycle wants to migrate the
+// reset flow to a dedicated table (for requestedIp audit + multi-token
+// concurrency), a new migration will re-add it. For now: ship ONE source of
+// truth (the User column) — do not ship both.
+//
+// (model removed)
+
+// ================= PROCUREMENT & STOCK INVENTORY =================
+
+model Supplier {
+  id            String   @id @default(cuid())
+  vendorId      String
+  name          String
+  contactPerson String?
+  mobile        String?
+  email         String?
+  address       String?
+  tin           String?
+  notes         String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([vendorId])
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  vendorId  String
+  name      String
+  branchId  String?
+  address   String?
+  keeperId  String? // employee id of the store keeper
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+}
+
+model Item {
+  id             String   @id @default(cuid())
+  vendorId       String
+  code           String // ITM-0001
+  name           String
+  category       String?
+  unit           String   @default("pcs")
+  reorderLevel   Float    @default(0)
+  lastCost       Float    @default(0)
+  notes          String?
+  brandModel     String?
+  serialImei     String?
+  purchaseDate   String?
+  hasWarranty    Boolean  @default(false)
+  warrantyExpiry String?
+  isReturnable   Boolean  @default(false)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([vendorId, code])
+  @@index([vendorId, category])
+}
+
+model ItemCategory {
+  id          String   @id @default(cuid())
+  vendorId    String
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([vendorId, name])
+  @@index([vendorId])
+}
+
+model ItemUnit {
+  id        String   @id @default(cuid())
+  vendorId  String
+  name      String
+  symbol    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([vendorId, name])
+  @@index([vendorId])
+}
+
+// Quantity on hand per item per warehouse. Mutated ONLY transactionally
+// together with StockTransaction rows — the ledger is the source of truth.
+model StockLevel {
+  id          String   @id @default(cuid())
+  vendorId    String
+  itemId      String
+  warehouseId String
+  quantity    Float    @default(0)
+  reserved    Float    @default(0) // reserved for approved, un-issued requisitions
+  updatedAt   DateTime @updatedAt
+
+  @@unique([itemId, warehouseId])
+  @@index([vendorId])
+}
+
+// Append-only inventory ledger.
+model StockTransaction {
+  id           String   @id @default(cuid())
+  vendorId     String
+  itemId       String
+  warehouseId  String
+  kind         String // ENTRY | ISSUE | ADJUST | RESERVED | RELEASED
+  quantity     Float // signed: +in / -out (absolute for RESERVED/RELEASED states)
+  unitCost     Float    @default(0)
+  balanceAfter Float? // level after the mutation (audit convenience)
+  refType      String? // StockEntry | GoodsRequisition | MANUAL
+  refId        String?
+  note         String?
+  byUserId     String?
+  byUserName   String?
+  createdAt    DateTime @default(now())
+
+  @@index([vendorId, itemId, createdAt])
+  @@index([vendorId, warehouseId])
+}
+
+model GoodsRequisition {
+  id                String                 @id @default(cuid())
+  vendorId          String
+  code              String // GR-2026-00001
+  employeeId        String // requester (self-service or on-behalf)
+  branchId          String?
+  departmentId      String?
+  priority          String                 @default("NORMAL") // URGENT | NORMAL | LOW
+  neededBy          String? // ISO date
+  purpose           String?
+  status            String                 @default("DRAFT")
+  // DRAFT → PENDING → APPROVED → (PENDING_STOCK | PURCHASE_REQUIRED) → STOCK_AVAILABLE → ISSUED → COMPLETED | RECEIPT_DISPUTED | REJECTED | RETURNED | CANCELLED
+  approvalRequestId String?
+  decisionNote      String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  items             GoodsRequisitionItem[]
+
+  @@unique([vendorId, code])
+  @@index([vendorId, status])
+  @@index([vendorId, employeeId])
+}
+
+model GoodsRequisitionItem {
+  id             String           @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from GoodsRequisition).
+  vendorId String
+  requisitionId  String
+  itemId         String? // null = free-text request
+  itemName       String
+  specification  String?
+  quantity       Float
+  issuedQuantity Float            @default(0)
+  remarks        String?
+  requisition    GoodsRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, requisitionId])
+}
+
+model GoodsRequisitionHistory {
+  id            String   @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from GoodsRequisition).
+  vendorId String
+  requisitionId String
+  action        String // CREATED | SUBMITTED | APPROVED | REJECTED | RETURNED | ISSUED | RECEIVED | DISPUTED | CANCELLED | STOCK_CHECK
+  note          String?
+  byUserId      String?
+  byUserName    String?
+  createdAt     DateTime @default(now())
+
+  @@index([vendorId, requisitionId, createdAt])
+}
+
+model PurchaseRequest {
+  id                String                @id @default(cuid())
+  vendorId          String
+  code              String // PR-2026-00001
+  requisitionId     String? // originating goods requisition (shortfall coverage)
+  requestedBy       String // employee id
+  status            String                @default("DRAFT")
+  // DRAFT → PENDING → APPROVED → PENDING_STOCK_ENTRY → STOCK_ENTERED | REJECTED | CANCELLED
+  approvalRequestId String?
+  purpose           String?
+  totalValue        Float                 @default(0) // selected quotation total
+  supplierId        String? // selected supplier
+  decisionNote      String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  items             PurchaseRequestItem[]
+
+  @@unique([vendorId, code])
+  @@index([vendorId, status])
+}
+
+model PurchaseRequestItem {
+  id                 String          @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from PurchaseRequest).
+  vendorId String
+  purchaseId         String
+  itemId             String?
+  itemName           String
+  specification      String?
+  quantity           Float
+  estimatedUnitPrice Float           @default(0)
+  remarks            String?
+  purchase           PurchaseRequest @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, purchaseId])
+}
+
+model PurchaseQuotation {
+  id             String                  @id @default(cuid())
+  vendorId       String
+  purchaseId     String
+  supplierId     String
+  supplierName   String
+  quotationNo    String? // supplier's own quotation reference
+  quotationDate  String? // ISO date on the quotation letter
+  total          Float                   @default(0) // items + delivery charge
+  deliveryTime   String? // free text, e.g. "7 days"
+  paymentTerms   String? // free text, e.g. "50% advance"
+  deliveryCharge Float                   @default(0)
+  validUntil     String?
+  status         String                  @default("SUBMITTED") // SUBMITTED | SELECTED | REJECTED
+  notes          String?
+  createdAt      DateTime                @default(now())
+  items          PurchaseQuotationItem[]
+
+  @@index([purchaseId])
+}
+
+model PurchaseQuotationItem {
+  id                String            @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from PurchaseQuotation).
+  vendorId String
+  quotationId       String
+  itemId            String?
+  itemName          String
+  quantity          Float             @default(1)
+  unitPrice         Float             @default(0)
+  discount          Float             @default(0)
+  vatTax            Float             @default(0)
+  purchaseQuotation PurchaseQuotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, quotationId])
+}
+
+// Stock Entry — goods received into a warehouse (from purchase or opening).
+model StockEntry {
+  id          String           @id @default(cuid())
+  vendorId    String
+  code        String // SE-2026-00001
+  purchaseId  String? // optional link to an approved purchase request
+  warehouseId String
+  supplierId  String?
+  invoiceNo   String?
+  entryDate   String // ISO date
+  remarks     String?
+  status      String           @default("DRAFT") // DRAFT → POSTED
+  postedAt    DateTime?
+  byUserId    String?
+  byUserName  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  items       StockEntryItem[]
+
+  @@unique([vendorId, code])
+  @@index([vendorId, status])
+}
+
+model StockEntryItem {
+  id             String     @id @default(cuid())
+  // DB-02 (R5) — child tables carry their tenant explicitly (backfilled from StockEntry).
+  vendorId String
+  entryId        String
+  itemId         String
+  itemName       String
+  brandModel     String?
+  quantity       Float
+  unitCost       Float      @default(0)
+  warrantyValue  Float?
+  warrantyUnit   String? // DAYS | MONTHS | YEARS
+  warrantyExpiry String? // ISO date YYYY-MM-DD
+  serialNumbers  String? // JSON string: ["SN1", "SN2"]
+  remarks        String?
+  stockEntry     StockEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, entryId])
+}
+
+// Tracked serial numbers received via stock entries for inventory items
+model InventoryItemSerial {
+  id             String     @id @default(cuid())
+  vendorId       String
+  itemId         String
+  warehouseId    String?
+  stockEntryId   String?
+  serialNumber   String
+  brandModel     String?
+  warrantyValue  Float?
+  warrantyUnit   String? // DAYS | MONTHS | YEARS
+  warrantyExpiry String? // ISO date YYYY-MM-DD
+  purchaseDate   String?
+  unitCost       Float      @default(0)
+  status         String     @default("AVAILABLE") // AVAILABLE | ISSUED
+  assetId        String?
+  employeeId     String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([vendorId, itemId, serialNumber])
+  @@index([vendorId, itemId, status])
+  @@index([vendorId, status])
+}
+
+// Receiver confirmation for issued goods (goods received by the requester).
+model GoodsReceiptConfirmation {
+  id            String   @id @default(cuid())
+  vendorId      String
+  requisitionId String
+  employeeId    String
+  decision      String // CONFIRM | DISPUTE
+  remarks       String?
+  createdAt     DateTime @default(now())
+
+  @@index([vendorId, requisitionId])
+}
+
+// ================= M-04/M-05 — background job queue =================
+// Heavy fan-out operations (communications.send up to 1,000 recipients,
+// payslips.emailAll, backups.export) return a job ID immediately and run in
+// the jobs.ts worker lane; clients poll jobs.get for progress + result.
+model BgJob {
+  id            String    @id @default(cuid())
+  vendorId      String
+  type          String // COMMUNICATION_SEND | PAYSLIP_EMAIL_ALL | BACKUP_EXPORT | …
+  payloadJson   String    @default("{}")
+  status        String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED | CANCELLED | DEAD (WP-A)
+  progress      Int       @default(0)
+  total         Int       @default(0)
+  resultJson    String?
+  error         String?
+  // ---- WP-A (2026-10-08) — production-grade queue fields (additive) ----
+  priority      Int       @default(5) // lower runs first (0=highest, 9=lowest)
+  scheduledFor  DateTime? // null = immediately eligible
+  attempts      Int       @default(0) // completed execution attempts
+  maxAttempts   Int       @default(3) // retries before DEAD (dead-letter)
+  cancelledAt   DateTime? // set when an admin/user cancels (cooperative)
+  lastErrorAt   DateTime?
+  runLogJson    String? // append-only attempt history [{startedAt,finishedAt,error,durationMs}]
+  createdBy     String?
+  createdByName String?
+  createdAt     DateTime  @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+
+  @@unique([vendorId, id]) // H-10 — structural tenant scoping
+  @@index([vendorId, status])
+  @@index([status, priority, createdAt]) // WP-A — the claim scan (priority-aware)
+  @@index([vendorId, type, status])
+}
+
+// ================= M-06 — persistent throttle buckets =================
+// Rate-limit state moved out of process memory into SQLite (survives restarts
+// and is shared across workers in single-instance deployments). Multi-instance
+// deployments need Redis — documented in SETUP.md. Fixed-window counters;
+// expired rows are swept by the jobs tick.
+model Throttle {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime
+  expiresAt   DateTime
+
+  @@index([expiresAt])
+}
+
+// ================= Camera Manager — CCTV for tenants =================
+// Brand-agnostic CCTV registry. Tenants (ecommerce vendors) register their
+// Hikvision / Dahua / EZVIZ / Imou cameras here; live viewing is handed off
+// to the brand's own cloud app via a launch target (deep link / QR / cloud
+// stream token). NO video bytes flow through this server — see
+// src/hrm/CONVENTIONS.md and src/hrm/API.md for the broader app conventions.
+//
+// Scoping: row-level multi-tenancy via vendorId (matches the rest of the
+// schema). BRANCH_MANAGER is further restricted to their own branchId via
+// cameraScopeFilter(ctx) in src/hrm-server/cameras/repository.ts (mirrors
+// deviceScopeFilter in routes/devices.ts). Point lookups use
+// assertTenant(rec, ctx) → 404, never 403, to prevent cross-tenant ID
+// enumeration. The H-10 structural composite @@unique([vendorId, id]) is
+// present on both tables for future FK joins (every FK-targeted table in
+// this schema has it — Employee, LeaveRequest, PayrollRun, PayrollEntry,
+// Loan, BgJob). AttendanceDevice omits it only because nothing FKs to it;
+// Camera and CameraCredential are different.
+//
+// Brand credentials split by brand class (Camera Manager §8):
+//   - Hikvision / Dahua  → per-camera; serialNumber + verificationCode live
+//                          on the Camera row (below). No CameraCredential row.
+//   - EZVIZ / Imou       → per-tenant-per-brand; {appKey, appSecret} or
+//                          {appId, appSecret} sealed in CameraCredential.
+//
+// CRITICAL: do NOT copy AttendanceDevice.commKey's plaintext-at-rest pattern
+// here. That field is a documented legacy exception (C-03). Camera cloud
+// credentials (EZVIZ/Imou appKey/appSecret) MUST be encrypted at rest via
+// crypto-field.ts (encryptField(plain, "cameras::v1")) and MUST be
+// decryptable server-side to call provider APIs. Never plaintext. Never
+// hash-only. See CameraCredential.encryptedPayload below.
+
+model Camera {
+  id                String    @id @default(cuid())
+  vendorId          String
+  brand             String // HIKVISION | DAHUA | EZVIZ | IMOU — String, not enum (SQLite has no native enum)
+  name              String
+  model             String?
+  serialNumber      String? // vendor-scoped informational serial (matches AttendanceDevice.serialNumber naming); not globally unique — cameras have no inbound webhook (§12)
+  channel           Int       @default(1) // stream/channel number for multi-channel NVRs
+  verificationCode  String? // Hikvision/Dahua per-device verifier (lives on Camera row, not CameraCredential — see Camera Manager §8)
+  branchId          String? // → Branch.id (location FK; null = unassigned)
+  location          String? // free-text sub-location within the branch ("Gate 2", "Reception")
+  installDate       String? // ISO date — user-entered dates in this codebase are String (Employee.dob, Holiday.date, Promotion.effectiveDate); only machine timestamps are DateTime
+  status            String    @default("UNKNOWN") // ONLINE | OFFLINE | UNKNOWN
+  lastStatusCheckAt DateTime? // when the server last polled the brand cloud API
+  lastSeenAt        DateTime? // brand-API last contact (distinct from lastStatusCheckAt)
+  lastError         String? // status-check failure reason ("EZVIZ token expired") — never include credentials; mirrors AttendanceDevice.lastError
+  enabled           Boolean   @default(true) // soft delete/deactivation — history is preserved (mirrors AttendanceDevice.enabled)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt // matches AttendanceDevice exactly (double annotation)
+
+  @@unique([vendorId, id]) // H-10 — structural tenant scoping for joins
+  @@unique([vendorId, serialNumber, channel]) // composite — NULL serialNumber treated as distinct per SQLite (accepted; cameras may pre-register)
+  @@index([vendorId])
+  @@index([vendorId, brand]) // serves brand-filtered listing
+  @@index([vendorId, branchId]) // serves branch-scoped queries for BRANCH_MANAGER
+  @@index([vendorId, enabled]) // serves the default enabled=true list filter
+}
+
+// CameraCredential — per-vendor+brand cloud-account credentials for EZVIZ/Imou.
+// Hikvision/Dahua use Camera.verificationCode instead and never write here.
+// One row per vendor+brand, NEVER per camera: a nullable cameraId in a unique
+// constraint would not stop two account-level rows for the same vendor+brand
+// (SQLite treats NULL as distinct in unique constraints — Camera Manager §7).
+// encryptedPayload is sealed via crypto-field.ts (extracted Phase 3) with the
+// "cameras::v1" context. encryptionKeyVersion is the camera-specific rotation
+// counter — MFA keeps its own "v2:" string prefix; the two mechanisms stay
+// separate on purpose (TODO(crypto-unification) — future cleanup).
+model CameraCredential {
+  id                   String    @id @default(cuid())
+  vendorId             String
+  brand                String // EZVIZ | IMOU (HIKVISION/DAHUA use Camera.verificationCode instead)
+  encryptedPayload     String // {appKey, appSecret} or {appId, appSecret} JSON, sealed via crypto-field.ts (encryptField(plain, "cameras::v1")) — NEVER plaintext, NEVER hash-only
+  encryptionKeyVersion Int       @default(1) // camera-specific rotation counter; MFA uses its own "v2:" prefix (kept separate — TODO(crypto-unification))
+  createdAt            DateTime  @default(now())
+  rotatedAt            DateTime?
+
+  @@unique([vendorId, id]) // H-10 — structural tenant scoping for joins
+  @@unique([vendorId, brand])
+  @@index([vendorId])
+}
+
+
+// ============================================================================
+// ================= SaaS PLATFORM LAYER (public site + owner panel) ==========
+// ============================================================================
+// Added for the SaaS business layer (marketing website, prospective-customer
+// registration, plan/subscription entitlements, SaaS-owner control panel).
+//
+// PLANE SEPARATION (hard requirement): these models belong to the PLATFORM
+// plane, not the tenant plane. Tenant models all carry `vendorId`; the
+// platform models either carry no tenant reference (SaasPlan, SaasOwnerUser,
+// SaasSetting) or reference Vendor only as a *customer* record
+// (SaasSubscription.vendorId = "which tenant bought this plan").
+// The existing tenant HRM code NEVER queries these tables, and the owner
+// plane NEVER writes tenant business data. Cross-plane access happens in
+// exactly two audited, server-side places: tenant provisioning (approval)
+// and entitlement resolution (read-only).
+//
+// Naming: SaaS* prefix keeps the platform tables grouped together in the
+// generated client (db.saasPlan, db.saasOwnerUser, …) — easy to audit that
+// no tenant route ever touches them.
+
+// ---- Plans: what a customer can buy ----------------------------------------
+// Prices/limits are normalized columns (NOT one JSON blob) so the owner can
+// filter/sort on them and future billing can compute from them safely.
+// Entitlement feature flags mirror the HRM module keys they gate.
+model SaasPlan {
+  id                 String    @id @default(cuid())
+  name               String
+  tagline            String? // short marketing line ("For growing organizations")
+  description        String?
+  monthlyPrice       Decimal   @db.Decimal(12, 2) @default(0)
+  yearlyPrice        Decimal   @db.Decimal(12, 2) @default(0)
+  currency           String    @default("BDT") // ISO 4217; single platform currency per plan
+  // ---- capacity limits (null = unlimited — Enterprise convention) ----
+  employeeLimit      Int?
+  userLimit          Int?
+  branchLimit        Int?
+  departmentLimit    Int?
+  deviceLimit        Int?
+  storageGb          Int? // platform storage quota
+  trackingEmployeeLimit Int?
+  // ---- module entitlements (what the subscription unlocks) ----
+  payrollEnabled     Boolean   @default(false)
+  aitEnabled         Boolean   @default(false)
+  inventoryEnabled   Boolean   @default(false)
+  procurementEnabled Boolean   @default(false)
+  performanceEnabled Boolean   @default(false)
+  essEnabled         Boolean   @default(true) // employee self-service portal
+  cameraEnabled      Boolean   @default(false)
+  trackingEnabled    Boolean   @default(false) // live employee tracking
+  geofenceEnabled    Boolean   @default(false) // geo-fence management
+  apiAccess          Boolean   @default(false)
+  advancedReports    Boolean   @default(false)
+  // ---- Wave 2 WP-M (2026-10-08) — Field Force premium feature ----
+  fieldForceEnabled  Boolean   @default(false)
+  supportLevel       String    @default("STANDARD") // STANDARD | PRIORITY | DEDICATED
+  // ---- 2026-10-25 custom plans (master prompt Part G §12) ----
+  // A custom plan is tenant-specific: isCustom + customForVendorId binds it
+  // to ONE tenant; it never appears in the public catalog (isPublic=false).
+  // billingMode: RECURRING (monthly/yearly price) | ONE_TIME (single charge).
+  // For ONE_TIME: oneTimeValidityDays null = explicitly non-expiring;
+  // a number = fixed validity window from assignment.
+  billingMode          String    @default("RECURRING") // RECURRING | ONE_TIME
+  oneTimeValidityDays  Int?
+  isCustom             Boolean   @default(false)
+  customForVendorId    String?
+  // ---- storefront / lifecycle ----
+  isPublic           Boolean   @default(true) // listed on /pricing
+  active             Boolean   @default(true) // purchasable/assignable
+  isTrialPlan        Boolean   @default(false)
+  badge              String? // pricing-card highlight ("Most Popular")
+  sortOrder          Int       @default(0)
+  isDemo             Boolean   @default(false) // seeded sample — never counted as real production data
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  subscriptions SaasSubscription[]
+  registrations SaasRegistration[]
+
+  @@index([active, isPublic, sortOrder])
+  @@map("SaaSPlan")
+}
+
+// ---- Subscription: one CURRENT subscription row per tenant -----------------
+// History is preserved via SaasSubscriptionEvent (append-only); changing a
+// plan updates this row and records the previous state as an event.
+model SaasSubscription {
+  id               String   @id @default(cuid())
+  vendorId         String   @unique // one current subscription per tenant
+  vendor            Vendor  @relation(fields: [vendorId], references: [id])
+  planId           String
+  plan             SaasPlan @relation(fields: [planId], references: [id])
+  planName         String // snapshot at assignment (plans can be renamed/archived)
+  billingCycle     String   @default("MONTHLY") // MONTHLY | YEARLY
+  // TRIAL | PENDING_PAYMENT | ACTIVE | PAST_DUE | GRACE_PERIOD | EXPIRED | SUSPENDED | CANCELLED
+  status           String   @default("ACTIVE")
+  startDate        DateTime @default(now())
+  // endDate null = explicitly non-expiring one-time entitlement (master
+  // prompt §12.1C). Recurring subscriptions always carry a concrete endDate.
+  endDate          DateTime? // computed from cycle at creation; extended on renewal
+  // billing-mode snapshot at assignment — RECURRING | ONE_TIME (from the plan)
+  billingMode      String   @default("RECURRING")
+  gracePeriodDays  Int      @default(0)
+  // pricing snapshot — the plan's price at assignment time; later plan edits
+  // must never rewrite what an existing customer actually pays.
+  priceAtCreation  Decimal  @db.Decimal(12, 2) @default(0)
+  currencySnapshot String   @default("BDT")
+  notes            String?
+  createdBy        String? // owner user id
+  createdByName    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  events SaasSubscriptionEvent[]
+  invoices SaasInvoice[]
+
+  @@index([status, endDate]) // renewal calendar lookups
+  @@index([planId])
+  @@map("SaaSSubscription")
+}
+
+// ---- Append-only subscription history --------------------------------------
+model SaasSubscriptionEvent {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  subscription   SaasSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  vendorId       String
+  type           String // CREATED | EXTENDED | UPGRADED | DOWNGRADED | CYCLE_CHANGED | SUSPENDED | REACTIVATED | CANCELLED | EXPIRED | GRACE_APPLIED | PLAN_CHANGED | OVERRIDE_CHANGED
+  fromSnapshot   String? @default("{}") // JSON of prior state
+  toSnapshot     String? @default("{}") // JSON of new state
+  note           String?
+  actorId        String? // owner user
+  actorName      String?
+  createdAt      DateTime @default(now())
+
+  @@index([vendorId, createdAt])
+  @@index([subscriptionId])
+  @@map("SaaSSubscriptionEvent")
+}
+
+// ---- Registration applications (prospective customers) ---------------------
+// The public /register form writes one row; NOTHING tenant-side is created
+// until a SaaS owner approves it. The admin's chosen password is hashed here
+// at submit time and is used to provision the tenant admin at approval —
+// the password never travels again and is never stored in plaintext.
+model SaasRegistration {
+  id                String   @id @default(cuid())
+  applicationNumber String   @unique // HRM-2026-000123 (platform sequence)
+  // ---- organization ----
+  organizationName  String
+  organizationType  String? // PRIVATE_LTD | PLC | GOV | NGO | PARTNERSHIP | PROPRIETORSHIP | OTHER
+  industry          String?
+  website           String?
+  address           String?
+  city              String?
+  country           String   @default("Bangladesh")
+  contactNumber     String?
+  officialEmail     String
+  // ---- primary administrator ----
+  adminName         String
+  adminDesignation  String?
+  adminEmail        String
+  adminPhone        String?
+  adminPasswordHash String // scrypt — becomes the tenant admin credential on approval
+  // ---- requested scale ----
+  employeeCount     Int      @default(0)
+  branchCount       Int      @default(1)
+  deviceCount       Int      @default(0)
+  requestedModules  String   @default("[]") // JSON string[] of module keys
+  // ---- plan preference ----
+  planId            String?
+  plan              SaasPlan? @relation(fields: [planId], references: [id])
+  planName          String? // snapshot (plan may be archived later)
+  billingCycle      String   @default("MONTHLY")
+  // ---- lifecycle: PENDING | UNDER_REVIEW | PROVISIONING | APPROVED | REJECTED | SUSPENDED | CANCELLED ----
+  // PROVISIONING is a transient claim status used by S1-001 conditional-claim fix
+  // to prevent double-approval races; it is immediately replaced by APPROVED on success.
+  status            String   @default("PENDING")
+  // ---- review (owner-side) ----
+  internalNote      String? // private to the SaaS team
+  reviewNote        String? // shared on the status page (safe to show the applicant)
+  rejectionReason   String?
+  reviewedById      String?
+  reviewedByName    String?
+  reviewedAt        DateTime?
+  requestedInfoAt   DateTime? // "request information" timestamp
+  // ---- outcome ----
+  approvedVendorId  String? // set on approval — links application → tenant
+  subscriptionId    String?
+  isDemo            Boolean  @default(false)
+  source            String   @default("WEBSITE") // WEBSITE | ADMIN
+  submitIp          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([adminEmail])
+  @@index([officialEmail])
+  @@map("SaaSRegistration")
+}
+
+// ---- Per-tenant feature/storage overrides (owner support lever) ------------
+// Distinct from plan entitlements: an owner can temporarily enable/disable a
+// module for ONE tenant (support grace, enterprise negotiation, incident).
+// Every change is audited and recorded in the subscription event log.
+model SaasTenantOverride {
+  id           String   @id @default(cuid())
+  vendorId     String   @unique
+  // JSON: { moduleKey: boolean } — only keys present override the plan value
+  featureToggles String @default("{}")
+  storageGbOverride Int?
+  note         String?
+  updatedById  String?
+  updatedByName String?
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@index([vendorId])
+  @@map("SaaSTenantOverride")
+}
+
+// ---- SaaS owner identities (completely separate from tenant users) ---------
+// Roles: SUPER_ADMIN | ADMINISTRATOR | SALES_MANAGER | BILLING_MANAGER | SUPPORT_MANAGER
+model SaasOwnerUser {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  name             String
+  passwordHash     String // scrypt, same format as tenant User.passwordHash
+  roleKey          String   @default("ADMINISTRATOR")
+  permissions      String   @default("[]") // JSON string[] of owner.* grants
+  status           String   @default("ACTIVE") // ACTIVE | SUSPENDED
+  lastLoginAt      DateTime?
+  failedLoginCount Int      @default(0)
+  lockedUntil      DateTime?
+  mfaEnrolled      Boolean  @default(false) // platform-plane TOTP (owner console)
+  // 2026-10-25 design systems — owner console design preference
+  designPreference String?
+  // self-service password recovery (sha-256 of the emailed token, mirroring
+  // the tenant User.passwordResetToken discipline)
+  passwordResetToken       String?
+  passwordResetExpiresAt   DateTime?
+  passwordResetRequestedAt DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  sessions         SaasOwnerSession[]
+  mfaSecret        SaasOwnerMfaSecret?
+
+  @@index([status])
+  @@map("SaaSOwnerUser")
+}
+
+// ---- Owner-console roles & permissions (Owner Console → Roles & Permissions) --
+// Platform-plane role definitions. The 5 built-in template roles (constants.ts
+// OWNER_ROLE_TEMPLATES) are seeded here as isSystem=true rows on first access
+// so they become viewable/editable in the console; custom roles are
+// isSystem=false. Resolution order at login: explicit SaasOwnerUser.permissions
+// grants, else this row (when active), else the static template. A deactivated
+// role yields an EMPTY permission set (deny all) for template-derived users —
+// explicit per-user grants still apply. isSystem roles cannot be deleted and
+// their key is immutable; SUPER_ADMIN additionally cannot be deactivated.
+model SaasOwnerRole {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  permissions String   @default("[]") // JSON string[] of owner.* grants
+  isSystem    Boolean  @default(false)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
+  @@map("SaaSOwnerRole")
+}
+
+// ---- Owner MFA secret (mirrors the tenant UserMfaSecret shape exactly: ------
+//      AES-256-GCM encrypted TOTP secret + sha-256 recovery-code hashes + the
+//      M-16 replay counter. Separate table so a tenant MFA row can never be
+//      confused with an owner one — same plane isolation as everything else.)
+model SaasOwnerMfaSecret {
+  id                String   @id @default(cuid())
+  ownerId           String   @unique
+  secretEnc         String // encrypted TOTP shared secret ("v2:" packed)
+  recoveryCodesHash String   @default("[]") // JSON array of sha256 hashes
+  lastUsedCounter   Int? // TOTP replay protection: highest accepted HMAC counter
+  enrolledAt        DateTime @default(now())
+  owner             SaasOwnerUser @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@map("SaaSOwnerMfaSecret")
+}
+
+// ---- Owner sessions (own cookie `saas_owner_session`; never mixes with
+//      tenant Session rows — different table, different cookie name, different
+//      dispatcher; a tenant user can never satisfy this lookup and vice versa)
+model SaasOwnerSession {
+  id         String   @id
+  // SEC-02 (R5) — hashed-at-rest owner session tokens (same scheme as the
+  // tenant plane; see the Session model note).
+  tokenHash  String?  @unique
+  ownerId    String
+  expiresAt  DateTime
+  csrfToken  String
+  ip         String?
+  userAgent  String?
+  kind       String   @default("FULL") // FULL | MFA_PENDING | ENROLL_PENDING (pre-auth challenges)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  owner      SaasOwnerUser @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  // SCL-19 (Phase 2 WS5) — same purge-path index as Session
+  @@index([expiresAt])
+  @@map("SaaSOwnerSession")
+}
+
+// ============================ STORAGE ACCOUNTING ============================
+// MOD-5 / SCL-6 prerequisite (Phase 2 WS6) — per-vendor storage rollup.
+// The storage-quota check used to run FOUR SUM(LENGTH(column)) scans (every
+// stored byte of the tenant) on every upload authorization; the owner console
+// did the same PER VENDOR per page load. Upload authorization now reads this
+// one row; write paths bump it incrementally (best-effort) and a nightly
+// set-based reconciliation self-heals any drift.
+model UsageRollup {
+  vendorId     String   @id
+  storageBytes BigInt   @default(0)
+  reconciledAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("UsageRollup")
+}
+
+// ---- Phase 4 WS-D — per-tenant usage metering for billing ------------------
+// A monthly, billing-grade usage series per tenant. The daily platform pass
+// captures/refreshes the CURRENT month for every vendor in ONE set-based
+// INSERT … ON CONFLICT (fleet-size independent); the last daily write of a
+// month is that month's frozen end-of-month record. Billing reconciliation
+// reads this series instead of re-deriving usage from live tables (which can
+// only ever answer "now").
+model UsageSnapshot {
+  id               String   @id @default(cuid())
+  vendorId         String
+  periodYear       Int
+  periodMonth      Int
+  employeesTotal   Int      @default(0)
+  employeesPayroll Int      @default(0) // payroll-scope statuses (the seats a run can pay)
+  portalUsers      Int      @default(0) // active User rows (portal seats)
+  devicesEnrolled  Int      @default(0) // enabled AttendanceDevice rows
+  storageBytes     BigInt   @default(0) // the reconciled UsageRollup value
+  capturedAt       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([vendorId, periodYear, periodMonth])
+  @@index([periodYear, periodMonth])
+}
+
+// ---- SCL-21 (Phase 3 WS-B) — distributed coordination primitives ------------
+// Postgres-backed lock rows: the ALWAYS-AVAILABLE backend for the distributed
+// lock API (src/hrm-server/coordination.ts). When REDIS_URL is configured the
+// Redis backend is preferred (SET NX PX + compare-and-del); this table is the
+// zero-infra fallback that still makes a 2+-instance deployment safe, and the
+// authoritative backend for single-instance deployments (one cheap upsert per
+// claim). Claims are conditional (expiresAt takeover) so concurrent claimers
+// can never both win — the same conditional-update discipline as BgJob.
+model CoordinationLock {
+  key       String   @id
+  holder    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@map("CoordinationLock")
+}
+
+// ---- MOB-1 (Phase 3 WS-D) — mobile/client refresh tokens --------------------
+// Opaque rotating refresh tokens for the /api/v1/auth/token endpoint. The RAW
+// token is shown once at issuance; only sha256(raw) is stored. Rotation is
+// per-family: presenting an already-rotated (revoked) token is treated as
+// theft and revokes the ENTIRE family plus the backing Session. The access
+// token itself is a short-lived JWT bound to the session (see _auth.ts).
+model ApiRefreshToken {
+  id         String    @id @default(cuid())
+  vendorId   String
+  userId     String
+  sessionId  String
+  tokenHash  String    @unique
+  familyId   String
+  scopesJson String    @default("[]")
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([familyId])
+  @@index([userId])
+  // DB-06 (R6) — the retention sweep deletes on expiresAt; without this index
+  // the purge seq-scanned the whole table.
+  @@index([expiresAt])
+  @@index([vendorId])
+  @@map("ApiRefreshToken")
+}
+
+// ---- Phase 5 P6 (WS-C) — Web Push subscriptions (RFC 8030/8291) --------------
+// One row per browser/device subscription (the push service endpoint URL is
+// globally unique — a re-subscribe upserts). Subscriptions are owned by the
+// logged-in USER (vendorId + userId); dispatch walks this table, an HTTP 404/
+// 410 from the push service deletes the row (the subscription is gone).
+model PushSubscription {
+  id            String    @id @default(cuid())
+  vendorId      String
+  userId        String
+  endpoint      String    @unique
+  p256dh        String // base64url, the subscription's ECDH P-256 public key
+  auth          String // base64url, the subscription's auth secret
+  platform      String    @default("web") // web | pwa | other
+  lastSuccessAt DateTime?
+  lastErrorAt   DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+
+  @@index([vendorId, userId])
+  @@index([vendorId])
+  @@map("PushSubscription")
+}
+
+// ---- OPS-5 (Phase 3 WS-E) — campaign bounce suppression list -----------------
+// Hard-bouncing / failing addresses are re-mailed by every later campaign.
+// Each FAILED send upserts a row (incrementing bounceCount); an address at or
+// past BOUNCE_SUPPRESS_AFTER consecutive bounces is suppressed (journaled
+// SKIPPED on future campaigns). Deleting the row re-enables the address.
+model CampaignBounce {
+  id           String   @id @default(cuid())
+  channel      String // EMAIL | SMS
+  address      String
+  bounceCount  Int      @default(1)
+  reason       String?
+  lastBounceAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@unique([channel, address])
+  @@index([channel, lastBounceAt])
+  @@map("CampaignBounce")
+}
+
+// ---- Platform audit log (separate from tenant AuditLog on purpose: ----------
+//      platform events have no vendorId of their own; the affected tenant is
+//      just the target. Keeps the owner console fast and the tenant audit view
+//      free of platform noise.)
+model SaasAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String? // owner user id (null = system/public action)
+  actorName String
+  action    String // REGISTRATION_APPROVED | PLAN_CHANGED | TENANT_SUSPENDED | ...
+  entity    String // SaasRegistration | SaasSubscription | Vendor | SaasPlan | ...
+  entityId  String?
+  vendorId  String? // affected tenant, when applicable
+  summary   String
+  metadata  String? @default("{}") // JSON: { from, to, reason, ... }
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+  @@index([vendorId, createdAt])
+  @@map("SaaSAuditLog")
+}
+
+// ---- Platform settings (no vendorId — these are global knobs) --------------
+model SaasSetting {
+  id        String   @id @default(cuid())
+  group     String // general | registration | subscription | security | communication
+  key       String
+  value     String // JSON
+  updatedAt DateTime @updatedAt
+
+  @@unique([group, key])
+  @@map("SaaSSetting")
+}
+
+// ---- Contact-form / sales inquiries from the public website ----------------
+model SaasContactInquiry {
+  id                String   @id @default(cuid())
+  name              String
+  email             String
+  phone             String?
+  company           String?
+  inquiryType       String   @default("SALES") // SALES | SUPPORT | PARTNERSHIP | OTHER
+  organizationSize  String? // "1-10" | "11-50" | "51-200" | "201-500" | "500+"
+  modulesRequested  String   @default("[]") // JSON string[]
+  message           String
+  // NEW | IN_REVIEW | RESPONDED | CLOSED
+  status            String   @default("NEW")
+  handledById       String?
+  handledByName     String?
+  handleNote        String?
+  handledAt         DateTime?
+  submitIp          String?
+  isDemo            Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@map("SaaSContactInquiry")
+}
+
+// ---- Billing architecture (payment-gateway-ready; manual until a gateway ----
+//      is connected — the owner records payments by hand, everything audited)
+model SaasInvoice {
+  id             String   @id @default(cuid())
+  vendorId       String
+  subscriptionId String?
+  subscription   SaasSubscription? @relation(fields: [subscriptionId], references: [id])
+  number         String   @unique // INV-2026-000123
+  periodStart    DateTime
+  periodEnd      DateTime
+  amount         Decimal  @db.Decimal(12, 2)
+  currency       String   @default("BDT")
+  // Financial Tax Snapshot (2026-10-26) — preserves historical VAT % and net/tax amounts
+  // at the time of invoice issuance. Changing platform VAT in the owner console never
+  // mutates historical invoices or past Mushak-6.3 tax certificates.
+  vatRatePercent Decimal  @default(5.00) @db.Decimal(5, 2)
+  netAmount      Decimal  @default(0.00) @db.Decimal(12, 2)
+  vatAmount      Decimal  @default(0.00) @db.Decimal(12, 2)
+  // 2026-10-25 — invoice kind: TERM (renewal/initial term) | UPGRADE (prorated
+  // plan-upgrade charge, applied on payment via changePlan semantics)
+  kind           String   @default("TERM")
+  // For kind=UPGRADE: the target plan the payment unlocks (validated at
+  // settlement; the current plan is preserved until the payment is verified).
+  upgradePlanId  String?
+  // PENDING | PAID | FAILED | REFUNDED | CANCELLED
+  status         String   @default("PENDING")
+  issuedAt       DateTime @default(now())
+  dueAt          DateTime?
+  paidAt         DateTime?
+  paymentMethod  String? // BANK | CASH | MFS | CARD (recorded when marked paid)
+  transactionId  String?
+  notes          String?
+  // R12 (2026-10-12) — Accept-application invoices: set when the invoice was
+  // issued by owner.registrations.accept (payment request BEFORE approval).
+  // On owner.registrations.approve the row is linked to the new subscription.
+  registrationId String?
+  createdById    String?
+  createdByName  String?
+  createdAt      DateTime @default(now())
+
+  payments SaasPayment[]
+
+  @@index([vendorId, status])
+  // Partial unique index created by migration 9_wave9zr_billing_idempotency_invoice_unique_20261026:
+  // "SaaSInvoice_sub_term_period_unique" ON ("subscriptionId", "periodStart", "periodEnd")
+  // WHERE "subscriptionId" IS NOT NULL AND "kind" = 'TERM' AND "status" != 'CANCELLED'
+  // (Prisma DSL does not natively express partial WHERE indexes; enforced at Postgres layer)
+  @@map("SaaSInvoice")
+}
+
+model SaasPayment {
+  id             String   @id @default(cuid())
+  invoiceId      String
+  invoice        SaasInvoice @relation(fields: [invoiceId], references: [id])
+  vendorId       String
+  amount         Decimal  @db.Decimal(12, 2)
+  currency       String   @default("BDT")
+  method         String? // BANK | CASH | MFS | CARD
+  transactionId  String?
+  status         String   @default("PAID") // PENDING | PAID | FAILED | REFUNDED
+  paidAt         DateTime @default(now())
+  recordedById   String?
+  recordedByName String?
+  createdAt      DateTime @default(now())
+  // ---- Wave 2 WP-I (2026-10-08) — online payment gateway checkout sessions ----
+  // (migration 9_wave2_saas_ops_20261008 — originally 11_wave2_saas_ops_20261008,
+  // renamed to fix alphabetical apply order; schema.sync completed by WP-H/I/J —
+  // see the worklog.) Manual/owner-recorded rows keep provider "MANUAL" and a
+  // NULL providerTxnId (Postgres unique treats NULLs as distinct, so manual
+  // history is unaffected); gateway checkouts carry the provider id + session
+  // id + the provider's own transaction id. @@unique([provider, providerTxnId])
+  // is the IPN replay guard: one settled payment row per provider txn.
+  provider       String   @default("MANUAL") // MANUAL | SSLCOMMERZ | BKASH | NAGAD | PAYSTATION | EPS
+  providerTxnId  String?
+  sessionId      String?
+  failureReason  String?
+  refundedAt     DateTime?
+  metaJson       String   @default("{}")
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@index([vendorId])
+  @@index([vendorId, status])
+  @@unique([provider, providerTxnId])
+  // ---- Wave 10 (2026-10-24) — provider-session lookup: the EPS merchant-portal
+  // IPN carries only the gateway's own session reference (our payment row is
+  // resolved through it when the query-string ref is stripped by the portal).
+  // Migration 9_wave9zp_infra_support_payments_storage_sms_20261024.
+  @@index([provider, sessionId])
+  @@map("SaaSPayment")
+}
+
+// ============================================================================
+// Website CMS (platform plane) — powers the fully owner-editable public site.
+// Plane discipline (§ schema header): these tables hold PUBLIC MARKETING
+// content only — never tenant business data. Rows are read by the public
+// server components via src/hrm-server/saas/cms.ts (typed defaults merged
+// over) and written exclusively through owner.cms.* RPC actions.
+// ============================================================================
+
+// One row per managed page. `slug` routes: "home" renders at "/", system
+// feature pages render at /features/<slug>, custom pages at /p/<slug>.
+model SaasCmsPage {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  pageType    String   @default("CUSTOM") // HOME | SYSTEM | CUSTOM
+  status      String   @default("PUBLISHED") // DRAFT | PUBLISHED
+  visible     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  showInNav   Boolean  @default(false)
+  navLabel    String?
+  seoTitle    String?
+  seoDesc     String?
+  blocks      String   @default("[]") // JSON: CmsBlock[]
+  isSystem    Boolean  @default(false) // system pages cannot be deleted
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([pageType, status, sortOrder])
+  @@map("SaaSCmsPage")
+}
+
+// Feature catalog for /features and /features/[slug]. `visual` selects the
+// coded simulation component rendered on the detail page (never screenshots).
+model SaasCmsFeature {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  title      String
+  navLabel   String
+  headline   String
+  sub        String
+  visual     String? // key into VISUALS registry (e.g. "live-tracking")
+  icon       String   @default("star")
+  accent     String   @default("blue")
+  sortOrder  Int      @default(0)
+  visible    Boolean  @default(true)
+  showOnHome Boolean  @default(true)
+  content    String   @default("{}") // JSON: FeatureContent
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([visible, sortOrder])
+  @@map("SaaSCmsFeature")
+}
+
+// Valued clients + their success stories / testimonials.
+model SaasCmsClient {
+  id          String   @id @default(cuid())
+  name        String
+  industry    String
+  description String
+  story       String?  @db.Text
+  quote       String?
+  personName  String?
+  personRole  String?
+  metrics     String   @default("[]") // JSON: {label, value}[]
+  logoText    String?
+  logoColor   String   @default("#2563eb")
+  logoUrl     String?
+  website     String?
+  featured    Boolean  @default(false)
+  visible     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([visible, sortOrder])
+  @@map("SaaSCmsClient")
+}
+
+// Testimonials (may be standalone or attached to a client by name).
+model SaasCmsTestimonial {
+  id         String   @id @default(cuid())
+  clientName String
+  personName String
+  personRole String
+  quote      String   @db.Text
+  rating     Int      @default(5)
+  visible    Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([visible, sortOrder])
+  @@map("SaaSCmsTestimonial")
+}
+
+// Media library for logo / favicon / images. Stored as data URLs (CSP allows
+// img-src data:) so no filesystem dependency survives standalone builds.
+model SaasCmsMedia {
+  id        String   @id @default(cuid())
+  name      String
+  mimeType  String
+  size      Int
+  data      String   @db.Text // data URL (base64)
+  // ---- WP-Q (2026-10-08) — Media Library 2.0 (additive) ----
+  folder    String   @default("") // path string ("marketing/2026")
+  tags      String   @default("[]") // JSON string[]
+  alt       String?
+  width     Int?
+  height    Int?
+  sizeBytes Int? // exact payload bytes (size keeps legacy meaning)
+  sha256    String? // content hash — duplicate detection
+  seoFilename String? // slugified, unique per folder
+  variantsJson String? // optimized renditions [{kind, width, mime, data}]
+  createdAt DateTime @default(now())
+
+  @@index([sha256])
+  @@index([folder])
+  @@map("SaaSCmsMedia")
+}
+
+// Site-level CMS settings (identity, nav, footer, SEO, contact, homepage
+// toggles). Key/value JSON without the 2000-char SaaSSetting clamp — media is
+// referenced by SaasCmsMedia id and resolved to data URLs at read time.
+model SaasSiteSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique // identity | nav | footer | seo | contact
+  value     String   @db.Text // JSON
+  updatedAt DateTime @updatedAt
+
+  @@map("SaaSSiteSetting")
+}
+
+
+// ================= WP-K (Wave 2, 2026-10-08) — Employee Asset Management =================
+// Fixed asset register with locked sequential codes (AST-0001 via
+// SequenceCounter), assignment lifecycle and an append-only event log.
+// Plain String FKs (employee/branch/item) + vendorId on every row: the
+// H-10 structural tenant scoping convention used across the codebase.
+model Asset {
+  id            String    @id @default(cuid())
+  vendorId      String
+  code          String // AST-0001 — locked auto-generated (Wave 1 pattern)
+  name          String
+  category      String    @default("OTHER") // LAPTOP|DESKTOP|MOBILE|SIM|ID_CARD|ACCESS_CARD|MONITOR|VEHICLE|FURNITURE|OTHER
+  brandModel    String?
+  serialImei    String?
+  purchaseDate  String? // ISO date
+  purchaseCost  Float?
+  warrantyExpiry String? // ISO date — warranty-expiring notifications
+  condition     String    @default("NEW") // NEW|GOOD|FAIR|DAMAGED
+  status        String    @default("IN_STOCK") // IN_STOCK|ASSIGNED|RETURNED|REPAIR|RETIRED|LOST
+  branchId      String?
+  locationNote  String?
+  sourceItemId  String? // WP-L — inventory item this asset was issued from
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([vendorId, id]) // H-10 — structural tenant scoping
+  @@unique([vendorId, code])
+  @@index([vendorId, status])
+  @@index([vendorId, category])
+  @@index([vendorId, branchId])
+  @@index([vendorId, warrantyExpiry])
+}
+
+model AssetAssignment {
+  id           String    @id @default(cuid())
+  vendorId     String
+  assetId      String
+  employeeId   String
+  assignedAt   DateTime  @default(now())
+  dueAt        DateTime?
+  returnedAt   DateTime? // null = outstanding (WP-L exit clearance blocks on this)
+  conditionOut String?
+  conditionIn  String?
+  note         String?
+  issuedById   String?
+  createdAt    DateTime  @default(now())
+
+  @@unique([vendorId, id]) // H-10
+  @@index([vendorId, assetId])
+  @@index([vendorId, employeeId])
+  @@index([vendorId, returnedAt])
+}
+
+model AssetEvent {
+  id           String   @id @default(cuid())
+  vendorId     String
+  assetId      String
+  type         String // ASSIGN|RETURN|REPAIR|RETIRE|LOSE|NOTE|CLEARED_WITH_DEDUCTION
+  actorId      String?
+  actorName    String?
+  snapshotJson String   @default("{}") // append-only audit snapshot
+  note         String?
+  createdAt    DateTime @default(now())
+
+  @@unique([vendorId, id]) // H-10
+  @@index([vendorId, assetId, createdAt])
+}
+
+// ================= WP-M (Wave 2) — Field Force Management =================
+// Visit locations are separate from attendance GeoFences (no coupling).
+// Plans/visits reuse the tracking GPS + photo upload infrastructure.
+model VisitLocation {
+  id           String   @id @default(cuid())
+  vendorId     String
+  name         String
+  address      String?
+  lat          Float
+  lng          Float
+  radiusM      Int      @default(150)
+  contactName  String?
+  contactPhone String?
+  note         String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@unique([vendorId, id]) // H-10
+  @@unique([vendorId, name])
+  @@index([vendorId, active])
+}
+
+model VisitPlan {
+  id         String   @id @default(cuid())
+  vendorId   String
+  employeeId String
+  date       String // ISO date — one plan per employee per day
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@unique([vendorId, id]) // H-10
+  @@unique([vendorId, employeeId, date])
+  @@index([vendorId, date])
+}
+
+model VisitPlanItem {
+  id         String   @id @default(cuid())
+  vendorId   String
+  planId     String
+  locationId String
+  plannedFrom String? // HH:MM window
+  plannedTo  String?
+  tasks      String?
+  createdAt  DateTime @default(now())
+
+  @@unique([vendorId, id]) // H-10
+  @@index([vendorId, planId])
+}
+
+model Visit {
+  id               String    @id @default(cuid())
+  vendorId         String
+  planItemId       String? // null = ad-hoc visit
+  employeeId       String
+  locationId       String
+  checkInAt        DateTime  @default(now())
+  checkInLat       Float?
+  checkInLng       Float?
+  checkInAccuracy  Float?
+  checkInPhotoId   String? // existing upload path (EXIF-stripped)
+  checkOutAt       DateTime?
+  checkOutLat      Float?
+  checkOutLng      Float?
+  durationMin      Int?
+  status           String    @default("CHECKED_IN") // PLANNED|CHECKED_IN|COMPLETED|MISSED|CANCELLED
+  remarks          String?
+  createdAt        DateTime  @default(now())
+
+  @@unique([vendorId, id]) // H-10
+  @@index([vendorId, employeeId, checkInAt])
+  @@index([vendorId, locationId])
+  @@index([vendorId, status])
+}
+
+// ================= WP-P (Wave 2) — Recruitment + public Careers =================
+model JobOpening {
+  id             String   @id @default(cuid())
+  vendorId       String
+  title          String
+  departmentId   String?
+  branchId       String? // location label for the public card
+  employmentType String   @default("FULL_TIME") // FULL_TIME|PART_TIME|CONTRACT|INTERN
+  description    String?
+  requirements   String?
+  openings       Int      @default(1)
+  salaryRange    String?
+  deadline       String? // ISO date
+  status         String   @default("DRAFT") // DRAFT|OPEN|PAUSED|CLOSED
+  isPublic       Boolean  @default(false) // visible on the public /careers page
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([vendorId, id]) // H-10
+  @@index([vendorId, status])
+  @@index([vendorId, isPublic])
+}
+
+model JobApplication {
+  id             String   @id @default(cuid())
+  vendorId       String
+  openingId      String
+  name           String
+  email          String?
+  phone          String?
+  expectedSalary Float?
+  coverNote      String?
+  cvFileId       String? // existing upload pattern
+  source         String   @default("WEBSITE") // WEBSITE|MANUAL
+  status         String   @default("NEW") // NEW|SHORTLISTED|INTERVIEW|OFFERED|HIRED|REJECTED
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([vendorId, id]) // H-10
+  @@index([vendorId, openingId])
+  @@index([vendorId, status])
+  @@index([vendorId, createdAt])
+}
+
+// ================= WP-R (Wave 2) — backup & restore-drill register =================
+model SaasBackupRun {
+  id            String    @id @default(cuid())
+  type          String // BACKUP | DRILL
+  trigger       String    @default("MANUAL") // MANUAL | SCHEDULED
+  status        String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+  sizeBytes     Int?
+  checksum      String? // sha256 of the artifact
+  locationType  String    @default("LOCAL") // LOCAL | S3
+  locationPath  String?
+  retentionKept Int?
+  error         String?
+  reportJson    String? // drill results (row-count comparison, verification)
+  createdAt     DateTime  @default(now())
+
+  @@index([type, startedAt])
+}
+
+// ---- Wave 3 WP-C (2026-10-08) — tenant plan-change requests -------------
+// Tenants whose roles lack billing.manage submit an upgrade/downgrade
+// request; the owner console approves (applying the same changePlan
+// semantics as the Billing portal) or rejects it. Plain String FK columns
+// (no Prisma relations) per the H-10 vendor-scoping convention.
+model SaasPlanChangeRequest {
+  id               String    @id @default(cuid())
+  vendorId         String
+  requestedPlanId  String
+  mode             String // UPGRADE | DOWNGRADE
+  note             String?
+  status           String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  requestedById    String?
+  requestedByName  String?
+  decidedById      String?
+  decidedByName    String?
+  decidedAt        DateTime?
+  decisionNote     String?
+  createdAt        DateTime  @default(now())
+
+  @@unique([vendorId, id])
+  @@index([vendorId, status])
+  @@index([status, createdAt])
+}
+
+// ================= WAVE 4 (2026-10-08) — platform depth =================
+// Four additive groups; every migration is 9_wave4_<letter>_… so the apply
+// order (alphabetical) stays: wave2_* < wave3_* < wave4_a < _b < _c < _d.
+// Plain String FK columns (no Prisma relations) per the H-10 convention.
+
+// ---- Wave 4 WP-A — saved report templates + scheduled delivery ----------
+model ReportTemplate {
+  id             String    @id @default(cuid())
+  vendorId       String
+  reportKey      String
+  name           String
+  filtersJson    String    @default("{}")
+  format         String    @default("XLSX") // XLSX | CSV
+  schedule       String    @default("OFF") // OFF | DAILY | WEEKLY | MONTHLY
+  recipientsJson String    @default("[]") // [{email, name?}]
+  lastRunAt      DateTime?
+  lastStatus     String? // SENT | FAILED | SKIPPED
+  active         Boolean   @default(true)
+  createdById    String?
+  createdByName  String?
+  createdAt      DateTime  @default(now())
+
+  @@unique([vendorId, name])
+  @@index([vendorId, active])
+  @@index([vendorId, schedule])
+}
+
+model ReportDeliveryLog {
+  id             String   @id @default(cuid())
+  vendorId       String
+  templateId     String
+  templateName   String
+  reportKey      String
+  format         String
+  status         String // SENT | FAILED | SKIPPED
+  detail         String?
+  recipientCount Int      @default(0)
+  rows           Int?
+  startedAt      DateTime @default(now())
+
+  @@index([vendorId, startedAt])
+  @@index([vendorId, templateId])
+}
+
+// ---- Wave 4 WP-B — accounting depth ------------------------------------
+model AccountingPeriod {
+  id            String    @id @default(cuid())
+  vendorId      String
+  name          String // FY2026-Q1, October 2026 …
+  startDate     String
+  endDate       String
+  status        String    @default("OPEN") // OPEN | CLOSED
+  closedById    String?
+  closedByName  String?
+  closedAt      DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@unique([vendorId, name])
+  @@index([vendorId, startDate])
+}
+
+model CostCenter {
+  id        String   @id @default(cuid())
+  vendorId  String
+  code      String
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([vendorId, code])
+}
+
+model Budget {
+  id             String   @id @default(cuid())
+  vendorId       String
+  periodId       String?
+  costCenterId   String?
+  accountCode    String
+  amount         Float
+  notes          String?
+  createdById    String?
+  createdByName  String?
+  createdAt      DateTime @default(now())
+
+  @@index([vendorId, periodId])
+  @@index([vendorId, accountCode])
+}
+
+// ---- Wave 4 WP-C — public REST API + webhooks ---------------------------
+model ApiKey {
+  id             String    @id @default(cuid())
+  vendorId       String
+  name           String
+  prefix         String // first 12 chars of the raw key, shown in UI
+  hash           String // sha256(raw) hex — raw key is never stored
+  scopesJson     String    @default("[]") // ["employees:read", …]
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdById    String?
+  createdByName  String?
+  createdAt      DateTime  @default(now())
+
+  @@unique([vendorId, prefix])
+  @@index([vendorId, revokedAt])
+}
+
+// ---- Phase 3 — Mobile/Desktop push device registry ----------------------
+// One row per enrolled device (Expo/FCM/APNs). A user may have multiple
+// devices. Tokens are refreshed by the mobile app on each launch and deleted
+// on logout. The push route uses these to deliver notifications.
+model DeviceToken {
+  id          String    @id @default(cuid())
+  vendorId    String
+  userId      String
+  // platform: "expo" (Expo Push) | "fcm" (Android FCM direct) | "apns" (iOS APNs direct)
+  platform    String    @default("expo")
+  // token: Expo push token ("ExponentPushToken[…]") or raw FCM/APNs token
+  token       String
+  deviceName  String?   // human-readable: "iPhone 15", "Pixel 8"
+  appVersion  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, token])
+  @@index([vendorId, userId])
+  @@index([token])
+}
+
+model WebhookEndpoint {
+  id             String    @id @default(cuid())
+  vendorId       String
+  url            String // https-only, SSRF-guarded on save
+  eventsJson     String    @default("[]") // ["employee.created", …]
+  secret         String? // encrypted at rest (crypto-field, M-36 pattern)
+  active         Boolean   @default(true)
+  description    String?
+  lastStatus     String?
+  lastDeliveredAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([vendorId, active])
+}
+
+model WebhookDelivery {
+  id              String    @id @default(cuid())
+  vendorId        String
+  endpointId      String
+  event           String
+  payloadJson     String
+  status          String    @default("PENDING") // PENDING | DELIVERED | FAILED
+  responseStatus  Int?
+  responseBody    String?
+  attempts        Int       @default(0)
+  nextAttemptAt   DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([vendorId, status])
+  @@index([status, nextAttemptAt])
+  @@index([vendorId, createdAt])
+}
+
+// ---- Wave 4 WP-D — recruitment ATS depth --------------------------------
+model JobInterview {
+  id              String   @id @default(cuid())
+  vendorId        String
+  applicationId   String
+  round           String   @default("R1") // R1 | R2 | R3 | HR | FINAL
+  mode            String   @default("ONSITE") // ONSITE | PHONE | VIDEO
+  scheduledAt     String // ISO datetime
+  durationMin     Int?
+  interviewerId   String?
+  interviewerName String?
+  location        String?
+  link            String?
+  notes           String?
+  outcome         String? // PENDING | PASSED | FAILED | CANCELLED
+  score           Float?
+  createdAt       DateTime @default(now())
+
+  @@index([vendorId, applicationId])
+  @@index([vendorId, scheduledAt])
+}
+
+model OfferLetter {
+  id             String    @id @default(cuid())
+  vendorId       String
+  applicationId  String
+  title          String
+  grade          String?
+  department     String?
+  joiningDate    String?
+  basicSalary    Float     @default(0)
+  houseRent      Float     @default(0)
+  medical        Float     @default(0)
+  transport      Float     @default(0)
+  otherAllowance Float     @default(0)
+  notes          String?
+  status         String    @default("DRAFT") // DRAFT | SENT | ACCEPTED | DECLINED
+  sentAt         DateTime?
+  decidedAt      DateTime?
+  createdById    String?
+  createdByName  String?
+  createdAt      DateTime  @default(now())
+
+  @@index([vendorId, applicationId])
+  @@index([vendorId, status])
+}
+
+model OnboardingTask {
+  id            String    @id @default(cuid())
+  vendorId      String
+  applicationId String?
+  employeeId    String?
+  title         String
+  assigneeId    String?
+  assigneeName  String?
+  dueDate       String?
+  doneAt        DateTime?
+  doneById      String?
+  doneByName    String?
+  createdAt     DateTime  @default(now())
+
+  @@index([vendorId, applicationId])
+  @@index([vendorId, doneAt])
+}
+
+// ============================================================================
+// Requirements round (2026-10-12) — platform-plane additions
+// Plain String FK columns (no Prisma relations) per the H-10 convention for
+// platform tables. Migration: 9_wave5_requirements_round_20261012.
+// ============================================================================
+
+// ---- R16 — login audit trail (success + failure, per attempt) ---------------
+// Privacy-conscious: stores the ATTEMPTED email (needed to correlate brute
+// force against known accounts), resolved identity when available, network
+// metadata, and a derived browser/OS/device label. Retention is enforced by
+// the daily jobs sweep (settings-driven, default 180 days).
+model LoginAuditLog {
+  id            String   @id @default(cuid())
+  // plane: TENANT (app /api/hrm auth.login + auth.mfa.verify) | OWNER (/api/owner)
+  plane         String   @default("TENANT") // TENANT | OWNER
+  email         String // the address as typed (lowercased)
+  success       Boolean  @default(false)
+  failureReason String? // INVALID_CREDENTIALS | LOCKED_OUT | MFA_REQUIRED_FAILED | INACTIVE_VENDOR | RATE_LIMITED | ERROR
+  userId        String?
+  userName      String?
+  vendorId      String?
+  vendorName    String?
+  role          String?
+  mfaUsed       Boolean  @default(false)
+  ip            String?
+  userAgent     String? // raw User-Agent (truncated)
+  browser       String? // derived label (Chrome 130, Firefox 131, Safari, Edge …)
+  os            String? // derived label (Windows 11, macOS, Android 14, Linux …)
+  deviceType    String? // desktop | mobile | tablet | bot | unknown
+  createdAt     DateTime @default(now())
+
+  @@index([vendorId, createdAt])
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+  @@index([success, createdAt])
+  @@map("LoginAuditLog")
+}
+
+// ---- R11 — SaaS-owner marketing/promotional campaigns -----------------------
+// Owner-plane mass communication to TENANT admins (not employees). Campaigns
+// target tenant audiences, run through the platform gateway, and keep a full
+// per-recipient delivery log with retry. Consent: Vendor.marketingOptOut.
+model SaasCampaign {
+  id             String    @id @default(cuid())
+  name           String
+  kind           String    @default("MARKETING") // MARKETING | PROMOTIONAL | CAMPAIGN | OFFER | NEWSLETTER
+  channel        String    @default("EMAIL") // EMAIL | SMS
+  subject        String? // EMAIL subject / SMS title (stored, not sent for SMS)
+  body           String
+  audienceType   String    @default("ALL") // ALL | ACTIVE | TRIAL | EXPIRED | PLAN | CUSTOM
+  audienceIds    String    @default("[]") // JSON: plan ids (PLAN) or vendor ids (CUSTOM)
+  status         String    @default("DRAFT") // DRAFT | SCHEDULED | SENDING | SENT | PARTIAL | FAILED
+  scheduledFor   DateTime?
+  sentAt         DateTime?
+  totalRecipients Int      @default(0)
+  sentCount      Int       @default(0)
+  failedCount    Int       @default(0)
+  skippedCount   Int       @default(0) // opted-out / missing address / gateway unset
+  templateId     String? // cloned source template (kept for provenance)
+  createdById    String?
+  createdByName  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  recipients SaasCampaignRecipient[]
+
+  @@index([status, scheduledFor])
+  @@index([createdAt])
+  @@map("SaaSCampaign")
+}
+
+model SaasCampaignRecipient {
+  id            String    @id @default(cuid())
+  campaignId    String
+  campaign      SaasCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  vendorId      String
+  vendorName    String?
+  contactEmail  String?
+  contactPhone  String?
+  status        String    @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  attempts      Int       @default(0)
+  lastError     String? // gateway error detail (never credentials)
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([campaignId, vendorId])
+  @@index([campaignId, status])
+  @@map("SaaSCampaignRecipient")
+}
+
+// Reusable owner-plane message templates. Placeholders {{tenantName}},
+// {{planName}}, {{endDate}}, {{platformName}}, {{offerCode}} are substituted
+// at send time; unknown placeholders are left verbatim (never blanked).
+model SaasCommunicationTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  kind        String   @default("MARKETING") // MARKETING | PROMOTIONAL | CAMPAIGN | OFFER | NEWSLETTER
+  channel     String   @default("EMAIL") // EMAIL | SMS
+  subject     String?
+  body        String
+  active      Boolean  @default(true)
+  createdById   String?
+  createdByName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([kind, active])
+  @@map("SaasCommunicationTemplate")
+}
+
+// ---- R15 — subscription expiry notice log (pre/post expiry, email+SMS) ------
+// One row per notice actually attempted (duplicate prevention is the
+// @@unique key: vendor + kind + reference date + lead/lag days + channel).
+// FAILED rows are retried by the next sweep run (attempts < 3).
+model SaasExpiryNotice {
+  id           String   @id @default(cuid())
+  vendorId     String
+  kind         String // PRE_EXPIRY | POST_EXPIRY | REJOIN_OFFER
+  refDate      String // the endDate (or expiry date) the notice refers to, YYYY-MM-DD
+  daysOffset   Int // days before (positive) / after (negative, or as configured) expiry
+  channel      String // EMAIL | SMS
+  status       String   @default("SENT") // PENDING | SENT | FAILED | SKIPPED
+  attempts     Int      @default(1)
+  detail       String? // delivery detail (gateway status; never credentials)
+  sentAt       DateTime @default(now())
+
+  @@unique([vendorId, kind, refDate, daysOffset, channel])
+  @@index([vendorId, sentAt])
+  @@index([status, sentAt])
+  @@map("SaasExpiryNotice")
+}
+
+// ============================================================================
+// Wave 10 — INFRASTRUCTURE ROUND (2026-10-24) — support access, payments
+// depth (Paystation/EPS), cloud object storage, SMS journal + OTP.
+// Migration 9_wave9zp_infra_support_payments_storage_sms_20261024.
+// Status columns are string unions by schema convention (NO Prisma enums).
+// ============================================================================
+
+// ---- Phase 2 — Time-Limited Support Access (owner → tenant plane) -----------
+// A THIRD session plane (own cookie `saas_support_session`, own table, own
+// CSRF token): a tenant token can never authorize an owner action and an
+// owner token can never open a tenant workspace — the one-time 60-second
+// enter capability minted by owner.supportAccess.start is the ONLY bridge.
+// Only the sha256 hash of every token is stored (enterTokenHash /
+// sessionTokenHash — same discipline as Session.tokenHash).
+model SaasSupportAccessSession {
+  id              String    @id @default(cuid())
+  targetVendorId  String
+  targetVendorName String
+  operatorOwnerId String
+  operatorName    String
+  operatorRoleKey String
+  reason          String
+  ticketRef       String?
+  // 2026-10-25 — origin tenant-submitted Live Support Access request (master
+  // prompt Part B §4.1). Null for owner-initiated sessions (legacy path).
+  liveRequestId   String?   @unique
+  // approved module scope for tenant-initiated sessions (JSON array of module
+  // keys from the approved SaasLiveSupportRequest; null/[] = owner-defined)
+  approvedModulesJson String @default("[]")
+  accessMode      String    @default("READ_ONLY") // READ_ONLY | CONTROLLED_WRITE
+  scopeJson       String    @default("[]") // controlled-write module.action allowlist
+  status          String    @default("PENDING") // PENDING | ACTIVE | ENDED | EXPIRED | REVOKED
+  enterTokenHash  String?   @unique // one-time 60s enter capability (burned on use)
+  enterExpiresAt  DateTime?
+  sessionTokenHash String?  @unique // live session cookie token hash (null when ended)
+  csrfToken       String?
+  requestedMinutes Int      @default(15)
+  startedAt       DateTime?
+  expiresAt       DateTime?
+  lastSeenAt      DateTime?
+  endedAt         DateTime?
+  endedReason     String?
+  endedById       String?
+  endedByName     String?
+  ip              String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+
+  @@index([targetVendorId, createdAt])
+  @@index([operatorOwnerId, createdAt])
+  @@index([status, expiresAt])
+  @@map("SaasSupportAccessSession")
+}
+
+// ---- 2026-10-25 — Support Center: tenant↔platform tickets + chat ----------
+// (master prompt Part A §3.1). Tenant-plane conversations with authorized
+// support personnel. vendorId is a plain string (SaaS-plane convention — see
+// SaasSupportAccessSession: no FK to Vendor, H-10 scoping enforced in routes).
+model SaasSupportTicket {
+  id              String    @id @default(cuid())
+  vendorId        String
+  number          String    @unique // TKT-2026-000123
+  subject         String
+  category        String    @default("GENERAL") // GENERAL | BILLING | ATTENDANCE | PAYROLL | LEAVE | EMPLOYEES | RECRUITMENT | REPORTS | SECURITY | DATA | INTEGRATION | OTHER
+  priority        String    @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  // OPEN | ASSIGNED | IN_PROGRESS | WAITING_TENANT | WAITING_SUPPORT | RESOLVED | CLOSED
+  status          String    @default("OPEN")
+  requesterUserId String
+  requesterName   String
+  assigneeOwnerId String?
+  assigneeName    String?
+  firstResponseAt DateTime?
+  lastMessageAt   DateTime?
+  closedAt        DateTime?
+  closedByName    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  messages SaasSupportMessage[]
+
+  @@index([vendorId, status, updatedAt])
+  @@index([status, priority, createdAt])
+  @@index([assigneeOwnerId])
+  @@map("SaasSupportTicket")
+}
+
+// One chat message inside a ticket. authorRole: TENANT (the requester or a
+// colleague with support.view) | SUPPORT (an owner-console operator).
+// Attachments ride the platform storage layer: attachmentsJson is a JSON
+// array of {objectKey, fileName, mimeType, sizeBytes, uploadedBy} referencing
+// StorageObject rows (storeUpload kind SUPPORT_ATTACHMENT) — signed URLs are
+// issued on read, never persisted.
+model SaasSupportMessage {
+  id          String   @id @default(cuid())
+  ticketId    String
+  ticket      SaasSupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorRole  String // TENANT | SUPPORT
+  authorId    String // user id (tenant plane) or owner user id
+  authorName  String
+  body        String   @db.Text
+  attachmentsJson String @default("[]")
+  internalNote Boolean @default(false) // support-side note, never shown to the tenant
+  readByTenantAt  DateTime?
+  readBySupportAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@map("SaasSupportMessage")
+}
+
+// ---- 2026-10-25 — Live Support Access REQUESTS (master prompt Part A §3.2,
+// Part B §4). A tenant-submitted request is NOT a session: review → approve
+// (modules + duration + agent) → activate (one-time link) are distinct,
+// audited operations. Approval creates a PENDING SaasSupportAccessSession
+// linked by liveRequestId.
+model SaasLiveSupportRequest {
+  id                String   @id @default(cuid())
+  vendorId          String
+  ticketId          String? // optional originating ticket
+  title             String
+  description       String   @db.Text
+  category          String   @default("GENERAL")
+  // requested module keys — validated against TENANT_MODULES + entitlements
+  modulesJson       String   @default("[]")
+  priority          String   @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  contextNote       String?  @db.Text // tenant-provided additional context
+  // PENDING_REVIEW | APPROVED | REJECTED | ACTIVE | COMPLETED | REVOKED | EXPIRED | CANCELLED
+  status            String   @default("PENDING_REVIEW")
+  requestedByUserId String
+  requestedByName   String
+  reviewedByOwnerId String?
+  reviewedByName   String?
+  reviewNote       String?   @db.Text // rejection reason / clarification / approval terms
+  approvedModulesJson String? // modules actually approved (subset of request)
+  approvedMinutes   Int?
+  approvedAgentOwnerId String?
+  approvedAgentName   String?
+  activatedSessionId String? // the SaasSupportAccessSession created on activation
+  requestedAt       DateTime @default(now())
+  reviewedAt        DateTime?
+  resolvedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([vendorId, status, createdAt])
+  @@index([status, priority, createdAt])
+  @@map("SaasLiveSupportRequest")
+}
+
+// ---- 2026-10-25 — WebAuthn / passkey credentials (master prompt Part K §16) --
+// TWO planes, ONE table: plane="TENANT" → userId is a tenant User id (with
+// vendorId); plane="OWNER" → userId is a SaasOwnerUser id (vendorId null).
+// ONLY public-key material is stored — the browser/OS handles biometrics;
+// raw biometric data never reaches the server.
+model WebAuthnCredential {
+  id            String   @id @default(cuid())
+  plane         String // TENANT | OWNER
+  userId        String
+  vendorId      String?
+  credentialId  String   @unique // base64url of the authenticator credential id
+  publicKey     String   @db.Text // COSE pubkey, base64url
+  counter       BigInt   @default(0)
+  transports    String?  // JSON array: ["internal","hybrid","cross-platform",…]
+  deviceName    String   @default("Passkey")
+  backupEligible Boolean @default(false)
+  backupState   Boolean @default(false)
+  lastUsedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  @@unique([plane, userId, credentialId])
+  @@index([plane, userId])
+  @@map("WebAuthnCredential")
+}
+
+// Single-use WebAuthn challenges (registration + authentication), 120s TTL,
+// burned on use — replay-safe.
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  plane     String // TENANT | OWNER
+  userId    String?
+  challenge String // base64url, single-use
+  type      String // REGISTRATION | AUTHENTICATION
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([plane, userId, expiresAt])
+  @@map("WebAuthnChallenge")
+}
+
+// ---- Phase 6 — SMS delivery journal (BOTH planes) ----------------------------
+// Every outbound submission is journaled for reconciliation, cost accounting
+// and abuse forensics. OTP rows store the body LENGTH only — the code itself
+// never touches this table. vendorId is null on the PLATFORM plane.
+model SaasSmsMessage {
+  id                String    @id @default(cuid())
+  plane             String    @default("TENANT") // TENANT | PLATFORM
+  vendorId          String?
+  toPhone           String // normalized +880…
+  purpose           String // OTP_LOGIN | OTP_VERIFY | TEST | WISHES | NOTICE | CAMPAIGN | SYSTEM
+  templateKey       String?
+  bodyLength        Int       @default(0)
+  bodyPreview       String? // null for OTP purposes (never stored)
+  provider          String // sslwireless | generichttp | …
+  providerMessageId String?
+  status            String    @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  statusDetail      String?
+  attempts          Int       @default(0)
+  lastAttemptAt     DateTime?
+  deliveredAt       DateTime?
+  createdAt         DateTime  @default(now())
+  // matches migration 9_wave9zp exactly: NOT NULL, NO DB default — the
+  // Prisma client maintains this column via @updatedAt.
+  updatedAt         DateTime  @updatedAt
+
+  @@index([vendorId, createdAt])
+  @@index([plane, status, createdAt])
+  @@index([provider, providerMessageId])
+  @@map("SaasSmsMessage")
+}
+
+// ---- Phase 6 — OTP verifiers (SMS second factor / verification codes) -------
+// The code is stored ONLY as sha256(code + salt); attempts are capped per
+// issue; consumption is single-use. vendorId scopes tenant-plane verifications.
+model SaasOtpCode {
+  id         String    @id @default(cuid())
+  identifier String // phone (normalized) or email (lowercased)
+  channel    String    @default("SMS") // SMS | EMAIL
+  purpose    String // e.g. LOGIN_2FA | SUPPORT_ENTER | PHONE_VERIFY
+  codeHash   String // sha256(code + salt)
+  salt       String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  maxAttempts Int      @default(5)
+  consumedAt DateTime?
+  vendorId   String?
+  ip         String?
+  createdAt  DateTime  @default(now())
+
+  @@index([identifier, purpose, createdAt])
+  @@index([expiresAt])
+  @@map("SaasOtpCode")
+}
+
+// ---- Phase 4 — cloud object storage metadata ---------------------------------
+// One row per object handed to the storage abstraction (avatars, employee
+// documents, CMS media). objectKey is globally unique and provider-prefixed;
+// the payload itself lives in the configured bucket (Cloudflare R2 /
+// Cloudinary) — the DB keeps only metadata + the public/signed URL is derived
+// from objectKey per provider. status FAILED + lastError record upload
+// failures for the console's retry surface.
+model StorageObject {
+  id        String   @id @default(cuid())
+  vendorId  String
+  kind      String // AVATAR | EMPLOYEE_DOC | CMS_MEDIA | LETTER_PDF | EXPORT
+  objectKey String   @unique // provider-prefixed key inside the bucket
+  provider  String // r2 | cloudinary | local
+  mimeType  String
+  sizeBytes BigInt
+  sha256    String?
+  status    String   @default("STORED") // STORED | FAILED
+  refTable  String? // logical owner table name (audit provenance)
+  refId     String? // logical owner row id
+  lastError String?
+  createdAt DateTime @default(now())
+  // matches migration 9_wave9zp exactly: NOT NULL, NO DB default — the
+  // Prisma client maintains this column via @updatedAt.
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId, kind])
+  @@index([status])
+  @@map("StorageObject")
+}
+
+// ---- Wave 11 §4 — transactional outbox ---------------------------------------
+// Durable side-effect queue written INSIDE the same database transaction as
+// the state change that caused them (2026-10-26 scalability round, master
+// prompt §4: "No lost critical work between database transactions and job
+// enqueueing"). Settlement today flips payment+invoice in one $transaction;
+// the receipt email + invoice.paid webhook used to be fire-and-forget calls
+// AFTER the commit — a crash between the two silently lost the tenant's
+// receipt. They now land here atomically and a relay (tick + opportunistic
+// post-commit flush) delivers them with bounded exponential-backoff retries
+// and a FAILED dead-letter state surfaced through /api/metrics.
+//
+// Delivery semantics: at-least-once — every handler is idempotent (the
+// receipt re-reads the PAID invoice; webhookEmit journals per delivery).
+// Claiming uses UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED) so
+// N app instances can relay concurrently without double-claiming (§2/§4).
+model OutboxEvent {
+  id            String    @id @default(cuid())
+  type          String // invoice.paid.receipt | invoice.paid.webhook | …
+  vendorId      String? // tenant scoping (platform-wide events may be null)
+  payloadJson   String    @default("{}")
+  status        String    @default("PENDING") // PENDING | PROCESSING | DONE | FAILED
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(5)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
+
+  @@index([status, nextAttemptAt, createdAt]) // the SKIP LOCKED claim scan
+  @@index([type, vendorId])
+  @@map("OutboxEvent")
+}

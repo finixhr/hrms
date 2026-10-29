@@ -1,0 +1,45 @@
+// ============ Route registry: action → handler + permission + zod schema ============
+// Every action is enforced server-side: session → tenant → permission → scope
+// → (M-01) payload schema validation BEFORE the handler runs.
+import type { Ctx } from "../types"
+import type { ZodType } from "zod"
+
+export type Handler = (ctx: Ctx, payload: any, req?: Request) => Promise<unknown>
+export type RouteDef = {
+  perm?: [string, string]
+  /** RBAC-105 (re-audit 2026-10-18 repair) — ALTERNATIVE permission the
+   *  dispatcher accepts INSTEAD of `perm`. Use only when an action is
+   *  deliberately dual-verb (e.g. employees.changeShift accepts
+   *  employees.assign OR employees.edit, so tenants can delegate roster
+   *  assignment without profile-edit rights). The FIRST verb (`perm`)
+   *  remains the one the registry lints, the mutating/read-only-lockout
+   *  classifier and the UI affordances read — keep it the stronger/
+   *  canonical verb. `altPerm` only widens the dispatcher gate; handlers
+   *  keep their own in-handler checks for defense in depth. */
+  altPerm?: [string, string]
+  handler: Handler
+  public?: boolean
+  /** M-01 — Zod schema for the payload. When present, the dispatcher
+   *  validates the payload and passes the TYPED, STRIPPED object to the
+   *  handler. Fields not in the schema are dropped (whitelist behavior). */
+  schema?: ZodType<any, any>
+  /** SUB-002 (re-ported R3-2) — explicit read-only-lockout classification.
+   *  EXPIRED / SUSPENDED / CANCELLED tenants are locked read-only by the
+   *  dispatcher. The default classification is deny-by-default (an action is
+   *  mutating unless its head is in the dispatcher's READ_HEADS allowlist,
+   *  its perm verb is view/export/download, or its prefix is exempt).
+   *  Set this flag only to OVERRIDE that heuristic:
+   *    mutating: true  → always treated as a mutation (belt-and-braces)
+   *    mutating: false → a pure read that stays available while locked out */
+  mutating?: boolean
+}
+
+export const routes: Record<string, RouteDef> = {}
+
+export function route(action: string, def: RouteDef) {
+  routes[action] = def
+}
+
+export function getRoute(action: string): RouteDef | undefined {
+  return routes[action]
+}

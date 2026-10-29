@@ -1,0 +1,107 @@
+# ============ Prometheus alert-rule starter (audit L-34) ============
+# The app exposes Prometheus-format metrics at /api/metrics (auth-gated by
+# the HRM_INTERNAL_TOKEN header — see .env.example). This file is a STARTER
+# rule set for the three operational failure modes the audit called out:
+# the app being down, the background-job queue backing up, and device
+# ingest silently dying.
+#
+# Deploy (Prometheus):
+#   prometheus --config.file=...  with rule_files pointing here, e.g.
+#   rule_files: ["/etc/prometheus/hrm-alerts.rules.yml"]
+# The scrape job must send the internal token header:
+#   - job_name: hrm
+#     scrape_interval: 30s
+#     metrics_path: /api/metrics
+#     authorization:
+#       type: Bearer
+#       credentials: <HRM_INTERNAL_TOKEN>
+#
+# Tune the `for:` windows and thresholds to your deployment before use —
+# these defaults fit a single-instance ~200-employee tenant.
+
+groups:
+  - name: hrm-availability
+    rules:
+      # scrape target gone / app down / token rotated without updating Prometheus
+      - alert: HrmInstanceDown
+        expr: up{job="hrm"} == 0 or absent(up{job="hrm"})
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HRM metrics target is down ({{ $labels.instance }})"
+          description: >-
+            /api/metrics has been unreachable for 3 minutes — the app process,
+            Caddy, or the scrape token is broken. Check `systemctl status hrm`
+            and the token in the Prometheus scrape config.
+
+      # crash-loop signature: a young process that keeps restarting
+      - alert: HrmRestartLoop
+        expr: hrm_uptime_seconds < 120
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HRM process keeps restarting (uptime < 2m for 10m)"
+          description: >-
+            The process uptime has stayed under 2 minutes for 10 minutes —
+            crash-looping. Inspect logs/hrm.log and journalctl -u hrm.
+
+  - name: hrm-background-jobs
+    rules:
+      # mailer/SMS sweeper backlog (payroll notices, doc-expiry, attendance alerts)
+      - alert: HrmBgJobQueueBacklog
+        expr: hrm_bgjob_pending > 50
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Background-job queue backing up ({{ $value }} pending)"
+          description: >-
+            More than 50 background jobs have been pending for 15 minutes —
+            the job tick may be stalled or a sender is timing out.
+
+      - alert: HrmBgJobFailures
+        expr: increase(hrm_bgjob_failed[1h]) > 10
+        labels:
+          severity: warning
+        annotations:
+          summary: "Background jobs failing terminally ({{ $value }} in 1h)"
+          description: >-
+            Failed (terminal) background jobs in the last hour — check
+            CommunicationLog rows and the email/SMS gateway settings.
+
+  - name: hrm-device-plane
+    rules:
+      # ADMS/ISAPI ingest: raw events piling up unprocessed (sweeper stalled)
+      - alert: HrmDeviceIngestBacklog
+        expr: hrm_zkteco_raw_received > 200
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Raw device events awaiting processing ({{ $value }})"
+          description: >-
+            The ADMS sweeper is not keeping up (or is dead) — biometric
+            punches will appear late. Check Sync Monitor and the sweeper lock.
+
+      - alert: HrmDeviceDeadLetters
+        expr: increase(hrm_zkteco_raw_dead_letter[1h]) > 0
+        labels:
+          severity: info
+        annotations:
+          summary: "Device events dead-lettered ({{ $value }} in 1h)"
+          description: >-
+            Raw device events were moved to dead-letter status — inspect the
+            Sync Monitor out-of-window/error counters and the device clock.
+
+      - alert: HrmAllDevicesOffline
+        expr: hrm_devices_online == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No attendance devices report online"
+          description: >-
+            Every biometric terminal is offline for 30 minutes — network,
+            gateway, or Caddy device-plane issue (deploy/Caddyfile).

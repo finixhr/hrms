@@ -1,0 +1,114 @@
+{
+  "run": {
+    "status": "CALCULATED",
+    "employeeCount": 1,
+    "totals": {
+      "gross": 14192.68,
+      "grossPaisa": "1419268",
+      "ot": 0,
+      "otPaisa": "0",
+      "bonus": 0,
+      "bonusPaisa": "0",
+      "deduction": 0,
+      "deductionPaisa": "0",
+      "ait": 244.62,
+      "aitPaisa": "24462",
+      "net": 13948.06,
+      "netPaisa": "1394806"
+    }
+  },
+  "entries": [
+    {
+      "money": {
+        "gross": 14192.68,
+        "grossPaisa": "1419268",
+        "ot": 0,
+        "otPaisa": "0",
+        "bonus": 0,
+        "bonusPaisa": "0",
+        "commission": 0,
+        "commissionPaisa": "0",
+        "absence": 0,
+        "absencePaisa": "0",
+        "late": 0,
+        "latePaisa": "0",
+        "loan": 0,
+        "loanPaisa": "0",
+        "advance": 0,
+        "advancePaisa": "0",
+        "other": 0,
+        "otherPaisa": "0",
+        "guarantor": 0,
+        "guarantorPaisa": "0",
+        "ait": 244.62,
+        "aitPaisa": "24462",
+        "net": 13948.06,
+        "netPaisa": "1394806"
+      },
+      "presentDays": 6,
+      "absentDays": 0,
+      "leaveDays": 0,
+      "lateMinutes": 0,
+      "otMinutes": 0,
+      "breakdown": {
+        "earnings": [
+          {
+            "label": "Basic (prorated)",
+            "amount": 11538.58
+          },
+          {
+            "label": "House Rent (prorated)",
+            "amount": 2307.75
+          },
+          {
+            "label": "Medical (prorated)",
+            "amount": 115.56
+          },
+          {
+            "label": "Conveyance (prorated)",
+            "amount": 230.79
+          }
+        ],
+        "deductions": [
+          {
+            "label": "AIT (FY 2026-27 (Income Tax Act 2023))",
+            "amount": 244.62
+          }
+        ],
+        "attendance": {
+          "presentDays": 6,
+          "absentDays": 0,
+          "leaveDays": 0,
+          "lateMinutes": 0,
+          "lateDays": 0,
+          "otMinutes": 0,
+          "workingDays": 6
+        },
+        "gross": 14192.68,
+        "otAmount": 0,
+        "bonus": 0,
+        "commission": 0,
+        "absenceDeduction": 0,
+        "lateDeduction": 0,
+        "earlyLeaveDeduction": 0,
+        "repeatOffenderPenalty": 0,
+        "loanDeduction": 0,
+        "advanceDeduction": 0,
+        "otherDeduction": 0,
+        "otTiers": {},
+        "ait": {
+          "netMonthlyAit": 244.62,
+          "ruleSetName": "FY 2026-27 (Income Tax Act 2023)",
+          "mode": "SLAB"
+        },
+        "net": 13948.06,
+        "proration": {
+          "frequency": "WEEKLY",
+          "fraction": 0.2308,
+          "weekWorkingDays": 6,
+          "monthWorkingDays": 26
+        }
+      }
+    }
+  ]
+}

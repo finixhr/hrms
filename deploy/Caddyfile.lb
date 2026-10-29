@@ -1,0 +1,97 @@
+# ============ Caddyfile.lb — multi-instance load balancing (Wave 11 §2) =========
+# OPTIONAL layered on top of deploy/Caddyfile. Run N stateless app instances
+# (e.g. systemd template units hrm@1..3, or docker compose --scale) and put
+# THIS edge in front of them. Everything the instances share lives in
+# PostgreSQL + Redis already (DB sessions, BgJob queue, coordination locks,
+# outbox, L2 cache) — see docs/SCALING.md §2 for the statelessness contract.
+#
+#   caddy run --config deploy/Caddyfile.lb
+#
+# ┌────────────────────────────────────────────────────────────────────────────┐
+# │ ⚠ Same placeholder-domain warning as deploy/Caddyfile — replace before use.│
+# └────────────────────────────────────────────────────────────────────────────┘
+#
+# Instance ports: 3001..300N (PORT=3001 bun .next/standalone/server.js, etc.).
+# Each instance MUST serve /api/readyz for the active health checks below.
+
+finixhr-hrm.example.com {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-X-Powered-By
+	}
+
+	# ---- CDN-friendly static assets (docs/SCALING.md §3) ----------------------
+	# Next.js already emits immutable caching for /_next/static (content-hashed
+	# URLs). At the CADDY layer we make the cacheability explicit so a CDN in
+	# front (Cloudflare etc.) can cache these without guesswork. Authenticated
+	# pages, API responses and the device plane are NEVER matched here.
+	@immutable path /_next/static/* /favicon.ico /manifest.webmanifest /icon-*.png /logo.svg
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	# ---- load-balanced upstreams with ACTIVE health checks -------------------
+	# health_uri hits /api/readyz (readiness = DB reachable + migrations OK).
+	# An instance stops receiving traffic the moment it fails 3 probes; it
+	# comes back automatically when healthy again. lb_try_duration keeps a
+	# request waiting (bounded) for a healthy peer during a rolling restart
+	# instead of erroring — combined with the app's 30s SIGTERM drain, this
+	# gives zero-downtime deploys.
+	reverse_proxy 127.0.0.1:3001 127.0.0.1:3002 127.0.0.1:3003 {
+		lb_policy least_conn
+		health_uri /api/readyz
+		health_interval 10s
+		health_timeout 3s
+		health_status 2xx
+		fail_duration 30s
+		lb_try_duration 8s
+		lb_try_interval 250ms
+
+		# long payroll/report requests get room upstream (matches the single-
+		# instance Caddyfile's timeout posture)
+		transport http {
+			response_header_timeout 120s
+		}
+	}
+
+	request_body {
+		max_size 25MB
+	}
+}
+
+# ---------------------------------------------------------------------------
+# Device plane — SAME edge shape, independent upstream list. Devices keep
+# their own hostname so terminal traffic never queues behind human traffic
+# and can be routed to instances dedicated to ingestion as the fleet grows.
+# ---------------------------------------------------------------------------
+devices.finixhr-hrm.example.com {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-X-Powered-By
+	}
+
+	request_body {
+		max_size 3MB
+	}
+
+	reverse_proxy 127.0.0.1:3001 127.0.0.1:3002 127.0.0.1:3003 {
+		lb_policy first_available
+		health_uri /api/readyz
+		health_interval 10s
+		health_timeout 3s
+		health_status 2xx
+		fail_duration 30s
+		transport http {
+			response_header_timeout 120s
+		}
+	}
+}
+
+http://devices.finixhr-hrm.example.com {
+	redir https://devices.finixhr-hrm.example.com{uri} permanent
+}

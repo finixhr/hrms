@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the HRM encrypted database backup nightly at 02:30 (Asia/Dhaka)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+# H-11 — server-local time; deployments should set the system timezone to
+# Asia/Dhaka (sudo timedatectl set-timezone Asia/Dhaka) or adjust OnCalendar.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

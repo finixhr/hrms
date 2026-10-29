@@ -1,0 +1,107 @@
+{
+  "run": {
+    "status": "CALCULATED",
+    "employeeCount": 1,
+    "totals": {
+      "gross": 0,
+      "grossPaisa": "0",
+      "ot": 0,
+      "otPaisa": "0",
+      "bonus": 0,
+      "bonusPaisa": "0",
+      "deduction": 500,
+      "deductionPaisa": "50000",
+      "ait": 0,
+      "aitPaisa": "0",
+      "net": -500,
+      "netPaisa": "-50000"
+    }
+  },
+  "entries": [
+    {
+      "money": {
+        "gross": 0,
+        "grossPaisa": "0",
+        "ot": 0,
+        "otPaisa": "0",
+        "bonus": 0,
+        "bonusPaisa": "0",
+        "commission": 0,
+        "commissionPaisa": "0",
+        "absence": 0,
+        "absencePaisa": "0",
+        "late": 0,
+        "latePaisa": "0",
+        "loan": 0,
+        "loanPaisa": "0",
+        "advance": 0,
+        "advancePaisa": "0",
+        "other": 500,
+        "otherPaisa": "50000",
+        "guarantor": 0,
+        "guarantorPaisa": "0",
+        "ait": 0,
+        "aitPaisa": "0",
+        "net": -500,
+        "netPaisa": "-50000"
+      },
+      "presentDays": 26,
+      "absentDays": 0,
+      "leaveDays": 0,
+      "lateMinutes": 0,
+      "otMinutes": 0,
+      "breakdown": {
+        "adjustment": {
+          "note": "Adjustment statement — amounts are the correction vs the paid source run, not a second month",
+          "corrections": {
+            "gross": 0,
+            "ot": 0,
+            "bonus": 0,
+            "commission": 0,
+            "absence": 0,
+            "late": 0,
+            "ait": 0,
+            "pf": 0,
+            "net": -500
+          },
+          "recomputed": {
+            "gross": 52000,
+            "otAmount": 0,
+            "ait": {
+              "netMonthlyAit": 467,
+              "ruleSetName": "FY 2026-27 (Income Tax Act 2023)",
+              "mode": "SLAB"
+            },
+            "net": 51033
+          },
+          "source": {
+            "gross": 52000,
+            "otAmount": 0,
+            "ait": 467,
+            "net": 51533
+          }
+        },
+        "earnings": [],
+        "deductions": [
+          {
+            "label": "Other deduction (added)",
+            "amount": 500
+          }
+        ],
+        "attendance": {
+          "presentDays": 26,
+          "absentDays": 0,
+          "leaveDays": 0,
+          "lateMinutes": 0,
+          "lateDays": 0,
+          "otMinutes": 0,
+          "workingDays": 26
+        },
+        "net": -500,
+        "warnings": [
+          "Negative adjustment — this amount is recovered from the employee, not paid out."
+        ]
+      }
+    }
+  ]
+}

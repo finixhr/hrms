@@ -1,0 +1,28 @@
+skills/
+node_modules/
+# C-02 — secrets and live data must never be committed or packaged
+# R-F06 (R4 remediation, 2026-10-18): every environment profile that can carry
+# real credentials is ignored — .env.production and the .orig-backup snapshot
+# rode inside the 2026-10-17 shared archive.
+.env
+.env.production
+.env.orig-backup
+# SEC-1 (Phase 1) — the rotation audit record (hashes only) and the per-context
+# key overrides live with the operator's env files, never in the repo.
+.env.rotation-log
+.env.keys.local
+*.db
+*.log
+backups/
+# L-11 — e2e PID files (dev-server process management)
+.run/
+.next/
+# generated TypeScript incremental-build state
+tsconfig.tsbuildinfo
+
+prisma/db/
+.env.local
+desktop/src-tauri/target/
+mobile/dist/
+mobile/.expo/
+*.zip

@@ -1,0 +1,108 @@
+{
+  "run": {
+    "status": "CALCULATED",
+    "employeeCount": 1,
+    "totals": {
+      "gross": 52000,
+      "grossPaisa": "5200000",
+      "ot": 0,
+      "otPaisa": "0",
+      "bonus": 0,
+      "bonusPaisa": "0",
+      "deduction": 0,
+      "deductionPaisa": "0",
+      "ait": 467,
+      "aitPaisa": "46700",
+      "net": 51533,
+      "netPaisa": "5153300"
+    }
+  },
+  "entries": [
+    {
+      "money": {
+        "gross": 52000,
+        "grossPaisa": "5200000",
+        "ot": 0,
+        "otPaisa": "0",
+        "bonus": 0,
+        "bonusPaisa": "0",
+        "commission": 0,
+        "commissionPaisa": "0",
+        "absence": 0,
+        "absencePaisa": "0",
+        "late": 0,
+        "latePaisa": "0",
+        "loan": 0,
+        "loanPaisa": "0",
+        "advance": 0,
+        "advancePaisa": "0",
+        "other": 0,
+        "otherPaisa": "0",
+        "guarantor": 0,
+        "guarantorPaisa": "0",
+        "ait": 467,
+        "aitPaisa": "46700",
+        "net": 51533,
+        "netPaisa": "5153300"
+      },
+      "presentDays": 13,
+      "absentDays": 0,
+      "leaveDays": 0,
+      "lateMinutes": 0,
+      "otMinutes": 0,
+      "breakdown": {
+        "earnings": [
+          {
+            "label": "Basic",
+            "amount": 30000
+          },
+          {
+            "label": "House Rent",
+            "amount": 15000
+          },
+          {
+            "label": "Medical",
+            "amount": 5000
+          },
+          {
+            "label": "Conveyance",
+            "amount": 2000
+          }
+        ],
+        "deductions": [
+          {
+            "label": "AIT (FY 2026-27 (Income Tax Act 2023))",
+            "amount": 467
+          }
+        ],
+        "attendance": {
+          "presentDays": 13,
+          "absentDays": 0,
+          "leaveDays": 0,
+          "lateMinutes": 0,
+          "lateDays": 0,
+          "otMinutes": 0,
+          "workingDays": 26
+        },
+        "gross": 52000,
+        "otAmount": 0,
+        "bonus": 0,
+        "commission": 0,
+        "absenceDeduction": 0,
+        "lateDeduction": 0,
+        "earlyLeaveDeduction": 0,
+        "repeatOffenderPenalty": 0,
+        "loanDeduction": 0,
+        "advanceDeduction": 0,
+        "otherDeduction": 0,
+        "otTiers": {},
+        "ait": {
+          "netMonthlyAit": 467,
+          "ruleSetName": "FY 2026-27 (Income Tax Act 2023)",
+          "mode": "SLAB"
+        },
+        "net": 51533
+      }
+    }
+  ]
+}

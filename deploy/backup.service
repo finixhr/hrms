@@ -1,0 +1,25 @@
+[Unit]
+Description=Finix HR — nightly encrypted PostgreSQL backup (pg_dump)
+Documentation=file:///opt/hrm/docs/BACKUP_RESTORE.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# H-11 — unattended nightly backup. Install to /etc/systemd/system/ and copy
+# this env block to /etc/systemd/system/hrm-backup.env (mode 600 — holds the
+# encryption key; NEVER commit it):
+#   HRM_BACKUP_KEY=<openssl rand -hex 32>
+#   HRM_BACKUP_ALERT_EMAIL=ops@example.com
+#   BACKUP_OFFSITE_CMD=rclone copy {file} offsite:hrm-backups/
+#   DATABASE_URL=postgresql://hrm_user:CHANGE_ME@127.0.0.1:5432/hrm_production
+EnvironmentFile=/etc/systemd/system/hrm-backup.env
+User=hrm
+Group=hrm
+WorkingDirectory=/opt/hrm
+ExecStart=/bin/bash /opt/hrm/scripts/backup.sh
+# hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/hrm/backups /opt/hrm/prisma/db
+PrivateTmp=true

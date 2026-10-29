@@ -1,0 +1,64 @@
+name: Mobile Release Build (EAS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Target platform'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+      profile:
+        description: 'EAS build profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+  push:
+    tags:
+      - 'mobile-v*'
+
+jobs:
+  build-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci --legacy-peer-deps
+
+      - name: Verify TypeScript
+        working-directory: mobile
+        run: npm run typecheck
+
+      - name: Verify Expo configuration
+        working-directory: mobile
+        run: npx expo-doctor
+
+      - name: Run EAS Build
+        working-directory: mobile
+        run: |
+          PLATFORM="${{ github.event.inputs.platform || 'android' }}"
+          PROFILE="${{ github.event.inputs.profile || 'preview' }}"
+          eas build --platform $PLATFORM --profile $PROFILE --non-interactive

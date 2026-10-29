@@ -1,0 +1,11 @@
+;; ============ PgBouncer auth (template — EDIT BEFORE DEPLOYING) ================
+;; Format: "username" "password" — the password must be the SAME one the app
+;; uses in DATABASE_URL. auth_type=scram-sha-256 requires the SCRAM verifier
+;; (the line PostgreSQL stores in pg_authid), not the plaintext password.
+;;
+;; Generate the verifier from the DB host (as the postgres superuser):
+;;   SELECT concat('"', usename, '" "', passwd, '"') FROM pg_shadow WHERE usename = 'hrm';
+;; Paste the output below and chmod 600 this file (owned by the pgbouncer user).
+;;
+;; NEVER commit a filled-in copy of this file.
+"hrm" "SCRAM-SHA-256$<paste-the-verifier-from-pg_shadow>"

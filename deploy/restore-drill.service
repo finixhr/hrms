@@ -1,0 +1,16 @@
+[Unit]
+Description=Finix HR — quarterly restore drill
+Documentation=file:///opt/hrm/docs/BACKUP_RESTORE.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/systemd/system/hrm-backup.env
+User=hrm
+Group=hrm
+WorkingDirectory=/opt/hrm
+ExecStart=/bin/bash /opt/hrm/scripts/restore-drill.sh
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/hrm/backups /tmp
+PrivateTmp=true

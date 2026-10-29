@@ -1,0 +1,155 @@
+{
+  "run": {
+    "status": "CALCULATED",
+    "employeeCount": 1,
+    "totals": {
+      "gross": 61501.6,
+      "grossPaisa": "6150160",
+      "ot": 1442.32,
+      "otPaisa": "144232",
+      "bonus": 0,
+      "bonusPaisa": "0",
+      "deduction": 17796.69,
+      "deductionPaisa": "1779669",
+      "ait": 1330,
+      "aitPaisa": "133000",
+      "net": 43817.23,
+      "netPaisa": "4381723"
+    }
+  },
+  "entries": [
+    {
+      "money": {
+        "gross": 61501.6,
+        "grossPaisa": "6150160",
+        "ot": 1442.32,
+        "otPaisa": "144232",
+        "bonus": 0,
+        "bonusPaisa": "0",
+        "commission": 0,
+        "commissionPaisa": "0",
+        "absence": 7096.34,
+        "absencePaisa": "709634",
+        "late": 400,
+        "latePaisa": "40000",
+        "loan": 4000,
+        "loanPaisa": "400000",
+        "advance": 1000,
+        "advancePaisa": "100000",
+        "other": 300.3,
+        "otherPaisa": "30030",
+        "guarantor": 0,
+        "guarantorPaisa": "0",
+        "ait": 1330,
+        "aitPaisa": "133000",
+        "net": 43817.23,
+        "netPaisa": "4381723"
+      },
+      "presentDays": 24,
+      "absentDays": 3,
+      "leaveDays": 2,
+      "lateMinutes": 40,
+      "otMinutes": 180,
+      "breakdown": {
+        "earnings": [
+          {
+            "label": "Basic",
+            "amount": 50000.5
+          },
+          {
+            "label": "House Rent",
+            "amount": 10000.25
+          },
+          {
+            "label": "Medical",
+            "amount": 500.75
+          },
+          {
+            "label": "Conveyance",
+            "amount": 1000.1
+          }
+        ],
+        "deductions": [
+          {
+            "label": "Absence (3d, incl. 1d unpaid leave)",
+            "amount": 7096.34
+          },
+          {
+            "label": "Late (2d, 40m)",
+            "amount": 400
+          },
+          {
+            "label": "Loan Installment",
+            "amount": 4000
+          },
+          {
+            "label": "Advance Recovery",
+            "amount": 1000
+          },
+          {
+            "label": "G2 Canteen",
+            "amount": 100.1
+          },
+          {
+            "label": "G2 Transport",
+            "amount": 200.2
+          },
+          {
+            "label": "Provident Fund — Employee (10% of basic)",
+            "amount": 5000.05
+          },
+          {
+            "label": "AIT (FY 2026-27 (Income Tax Act 2023))",
+            "amount": 1330
+          }
+        ],
+        "attendance": {
+          "presentDays": 24,
+          "absentDays": 3,
+          "leaveDays": 2,
+          "unpaidLeaveDays": 1,
+          "lateMinutes": 40,
+          "lateDays": 2,
+          "otMinutes": 180,
+          "workingDays": 26
+        },
+        "gross": 61501.6,
+        "otAmount": 1442.32,
+        "bonus": 0,
+        "commission": 0,
+        "deductionLines": [
+          {
+            "amount": 100.1
+          },
+          {
+            "amount": 200.2
+          }
+        ],
+        "absenceDeduction": 7096.34,
+        "lateDeduction": 400,
+        "earlyLeaveDeduction": 0,
+        "repeatOffenderPenalty": 0,
+        "loanDeduction": 4000,
+        "advanceDeduction": 1000,
+        "otherDeduction": 300.3,
+        "pf": {
+          "employeeAmount": 5000.05,
+          "employerAmount": 4000.04,
+          "employeePct": 10,
+          "employerPct": 8,
+          "basis": "BASIC"
+        },
+        "otTiers": {
+          "weekly-off": 120,
+          "holiday": 60
+        },
+        "ait": {
+          "netMonthlyAit": 1330,
+          "ruleSetName": "FY 2026-27 (Income Tax Act 2023)",
+          "mode": "SLAB"
+        },
+        "net": 43817.23
+      }
+    }
+  ]
+}

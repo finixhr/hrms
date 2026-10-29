@@ -1,0 +1,53 @@
+[Unit]
+Description=Finix HR — Next.js 16 production server
+Documentation=file:///opt/hrm/DEPLOYMENT-GUIDE.md
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/systemd/system/hrm.env
+WorkingDirectory=/opt/hrm
+# M-31 — run as the dedicated service account (same convention as
+# backup.service). The unit previously ran as ROOT: any RCE in the app was
+# root-level despite the hardening block below. Create the account with:
+#   useradd --system --home /opt/hrm --shell /usr/sbin/nologin hrm
+# and chown -R hrm:hrm /opt/hrm/{storage,backups,logs}
+User=hrm
+Group=hrm
+ExecStart=/usr/local/bin/bun /opt/hrm/.next/standalone/server.js
+# M-32 — logrotate's postrotate `systemctl reload hrm.service` was a silent
+# no-op (no ExecReload): after rotation the server kept writing to the
+# renamed fd and log lines were lost. SIGUSR2 makes the app REOPEN its
+# stdout/stderr (see instrumentation.ts) so the new file receives writes.
+ExecReload=/bin/kill -USR2 $MAINPID
+# stdout/stderr to the rotating log file (logrotate.d/hrm rotates these);
+# journald still captures anything written before the redirect is in place.
+StandardOutput=append:/opt/hrm/logs/hrm.log
+StandardError=append:/opt/hrm/logs/hrm.log
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+KillMode=mixed
+# OPS-R1 (this audit) — graceful shutdown: SIGTERM lets in-flight BgJob
+# runners complete (instrumentation.ts registerShutdownHandlers).
+
+# Security hardening (OPS-R17). PostgreSQL owns its own data directory — the app
+# no longer writes any database file (the former /opt/hrm/prisma/db entry was
+# removed with the SQLite→PostgreSQL migration; prisma/db/ now only holds the
+# archived SQLite source used by scripts/migrate-sqlite-to-postgres.ts, read-only).
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/hrm/storage /opt/hrm/backups /opt/hrm/logs
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+RestrictNamespaces=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target
