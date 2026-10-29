@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finix HR Desktop</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Native Desktop Header Bar -->
+  <header class="app-header">
+    <div class="header-left">
+      <img src="assets/icon.png" alt="Finix HR" class="header-logo">
+      <span class="app-title">Finix HR</span>
+      <span class="version-badge" id="appVersion">v1.0.0</span>
+    </div>
+
+    <div class="header-center">
+      <div class="status-pill status-checking" id="statusPill">
+        <span class="status-dot"></span>
+        <span class="status-text" id="statusText">Connecting...</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="header-btn" id="btnRefresh" title="Reload Workspace">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+      </button>
+      <button class="header-btn" id="btnSettings" title="Server Settings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Viewport -->
+  <main class="app-main">
+    <!-- Active Workspace Iframe (Visible when connected) -->
+    <iframe id="workspaceFrame" class="workspace-frame" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
+
+    <!-- Native Connection Hub (Visible when offline or connecting) -->
+    <div id="connectionHub" class="connection-hub">
+      <div class="hub-card">
+        <div class="hub-icon-wrap">
+          <img src="assets/icon.png" alt="Finix HR" class="hub-icon">
+          <div class="pulse-ring"></div>
+        </div>
+
+        <h1 class="hub-title">Finix HR Desktop Workspace</h1>
+        <p class="hub-subtitle" id="hubSubtitle">Checking connectivity to HRM server...</p>
+
+        <div class="diagnostic-box" id="diagnosticBox">
+          <div class="diagnostic-row">
+            <span class="diag-label">Target Server:</span>
+            <span class="diag-value" id="diagUrl">https://finixhrm.com</span>
+          </div>
+          <div class="diagnostic-row">
+            <span class="diag-label">Connection Status:</span>
+            <span class="diag-value diag-error" id="diagStatus">Checking host...</span>
+          </div>
+        </div>
+
+        <div class="hub-actions">
+          <button class="btn btn-primary" id="btnRetry">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            <span>Retry Connection</span>
+          </button>
+          <button class="btn btn-secondary" id="btnSwitchLocal">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+              <line x1="6" y1="6" x2="6.01" y2="6"/>
+              <line x1="6" y1="18" x2="6.01" y2="18"/>
+            </svg>
+            <span>Switch to Local Server (localhost:4055)</span>
+          </button>
+        </div>
+
+        <div class="hub-footer">
+          <p class="hub-hint">
+            <strong>Self-Hosting or On-Premise?</strong> You can connect this desktop client to your local server, office LAN IP, or cloud domain in <a href="#" id="linkOpenSettings">Server Settings</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Server Settings Modal -->
+  <div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Server Connection Settings</h3>
+        <button class="modal-close" id="btnCloseSettings">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label for="inputServerUrl" class="input-label">HRM Server Base URL</label>
+        <input type="url" id="inputServerUrl" class="text-input" placeholder="http://localhost:4055 or https://finixhrm.com">
+        <p class="input-hint">The desktop client will load the Finix HR portal from this address.</p>
+
+        <div class="presets-section">
+          <span class="presets-title">Quick Presets:</span>
+          <div class="preset-buttons">
+            <button class="preset-pill" data-url="http://localhost:4055">Local Server (localhost:4055)</button>
+            <button class="preset-pill" data-url="https://finixhrm.com">Cloud Production (finixhrm.com)</button>
+            <button class="preset-pill" data-url="https://oms.finixhr.com">Finix Staging (oms.finixhr.com)</button>
+          </div>
+        </div>
+
+        <div id="testResult" class="test-result hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnTestUrl">Test Connection</button>
+        <button class="btn btn-primary" id="btnSaveUrl">Save & Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
