@@ -2,25 +2,16 @@
 
 import { useState } from "react";
 import {
-<<<<<<< HEAD
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Platform, StatusBar, RefreshControl, Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-=======
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Platform, StatusBar, RefreshControl, Alert,
-} from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
->>>>>>> origin/main
 import { useFetch } from "@/src/hooks/useFetch";
 import { rpc, ApiError } from "@/src/lib/api";
 import { Card, Badge, Button, EmptyState, SectionHeader, Input } from "@/src/components/ui";
 import { Colors, Spacing, Typography, Radius } from "@/src/theme";
 
 interface Ticket {
-<<<<<<< HEAD
   // support.tickets contract (routes/support.ts:133) — { rows: [...] }
   id: string; number: number; subject: string; category: string; status: string; priority: string;
   assigneeName?: string | null; lastMessageAt?: string | null; createdAt: string; closedAt?: string | null;
@@ -56,40 +47,13 @@ export default function SupportScreen() {
       // priority that does not exist.
       await rpc("support.ticket.create", { subject: subject.trim(), category, priority, message: message.trim() });
       setShowForm(false); setSubject(""); setMessage(""); setCategory("GENERAL"); setPriority("NORMAL");
-=======
-  id: string; subject: string; status: string; priority: string;
-  createdAt: string; lastMessage?: string;
-}
-
-const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
-
-export default function SupportScreen() {
-  const { data, refreshing, refresh } = useFetch<{ data: Ticket[] }>("support.myTickets", { page: 1 });
-  const tickets = data?.data ?? [];
-  const [showForm, setShowForm] = useState(false);
-  const [subject, setSubject]   = useState("");
-  const [body, setBody]         = useState("");
-  const [priority, setPriority] = useState("MEDIUM");
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async () => {
-    if (!subject.trim() || !body.trim()) { Alert.alert("Required", "Please fill in subject and message."); return; }
-    setSubmitting(true);
-    try {
-      await rpc("support.createTicket", { subject, body, priority });
-      setShowForm(false); setSubject(""); setBody(""); setPriority("MEDIUM");
->>>>>>> origin/main
       refresh();
     } catch (e) { Alert.alert("Error", e instanceof ApiError ? e.message : "Failed to create ticket"); }
     finally { setSubmitting(false); }
   };
 
   const priorityColor: Record<string, string> = {
-<<<<<<< HEAD
     LOW: Colors.success, NORMAL: Colors.warning, HIGH: Colors.danger, URGENT: "#7C3AED",
-=======
-    LOW: Colors.success, MEDIUM: Colors.warning, HIGH: Colors.danger, URGENT: "#7C3AED",
->>>>>>> origin/main
   };
 
   return (
@@ -117,7 +81,6 @@ export default function SupportScreen() {
             <Input label="Subject" value={subject} onChangeText={setSubject} placeholder="Brief description of the issue" />
 
             <View>
-<<<<<<< HEAD
               <Text style={[Typography.label, { marginBottom: 6 }]}>Category</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {CATEGORIES.map(c => (
@@ -130,8 +93,6 @@ export default function SupportScreen() {
             </View>
 
             <View>
-=======
->>>>>>> origin/main
               <Text style={[Typography.label, { marginBottom: 6 }]}>Priority</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {PRIORITIES.map(p => (
@@ -145,19 +106,11 @@ export default function SupportScreen() {
 
             <Input
               label="Message"
-<<<<<<< HEAD
               value={message}
               onChangeText={setMessage}
               multiline
               numberOfLines={4}
               placeholder="Describe the issue in detail (at least 10 characters)…"
-=======
-              value={body}
-              onChangeText={setBody}
-              multiline
-              numberOfLines={4}
-              placeholder="Describe the issue in detail…"
->>>>>>> origin/main
             />
             <Button label="Submit Ticket" onPress={submit} loading={submitting} variant="primary" fullWidth />
           </Card>
@@ -170,7 +123,6 @@ export default function SupportScreen() {
             <Card key={t.id} style={styles.ticketCard}>
               <View style={styles.ticketTop}>
                 <View style={[styles.priDot, { backgroundColor: priorityColor[t.priority] ?? Colors.info }]} />
-<<<<<<< HEAD
                 <Text style={[Typography.h4, { flex: 1 }]} numberOfLines={1}>#{t.number} · {t.subject}</Text>
                 <Badge label={t.status} />
               </View>
@@ -180,17 +132,6 @@ export default function SupportScreen() {
               <View style={styles.ticketFooter}>
                 <Text style={Typography.caption}>
                   {t.category} · {new Date(t.lastMessageAt ?? t.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-=======
-                <Text style={[Typography.h4, { flex: 1 }]} numberOfLines={1}>{t.subject}</Text>
-                <Badge label={t.status} />
-              </View>
-              {t.lastMessage && (
-                <Text style={[Typography.bodyS, { marginTop: 6 }]} numberOfLines={2}>{t.lastMessage}</Text>
-              )}
-              <View style={styles.ticketFooter}>
-                <Text style={Typography.caption}>
-                  {new Date(t.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
->>>>>>> origin/main
                 </Text>
                 <View style={[styles.priLabel, { backgroundColor: (priorityColor[t.priority] ?? Colors.info) + "20" }]}>
                   <Text style={[styles.priLabelText, { color: priorityColor[t.priority] ?? Colors.info }]}>{t.priority}</Text>

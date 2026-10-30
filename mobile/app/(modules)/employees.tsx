@@ -1,10 +1,6 @@
 // Employee directory screen — searchable, filterable, with avatars
 
-<<<<<<< HEAD
 import { useState } from "react";
-=======
-import { useState, useCallback } from "react";
->>>>>>> origin/main
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
   Platform, StatusBar, RefreshControl,
@@ -15,7 +11,6 @@ import { useFetch } from "@/src/hooks/useFetch";
 import { Avatar, Badge, EmptyState, Card } from "@/src/components/ui";
 import { Colors, Spacing, Typography, Radius } from "@/src/theme";
 
-<<<<<<< HEAD
 // Employee directory screen — searchable colleague list.
 //
 // SERVER CONTRACT (verified 2026-10-30): ess.colleagues (routes/ess.ts:170,
@@ -28,16 +23,10 @@ interface Colleague {
   id: string; code: string; fullName: string;
   designationName?: string | null; departmentName?: string | null;
   branchName?: string | null; sameBranch?: boolean; sameDepartment?: boolean;
-=======
-interface Employee {
-  id: string; code: string; fullName: string; designation?: string;
-  department?: string; status: string; email?: string; phone?: string;
->>>>>>> origin/main
 }
 
 export default function EmployeesScreen() {
   const [q, setQ] = useState("");
-<<<<<<< HEAD
   const { data, loading, refreshing, refresh } = useFetch<Colleague[]>("ess.colleagues", {});
 
   const list = (data ?? []).filter(e =>
@@ -45,28 +34,13 @@ export default function EmployeesScreen() {
     e.code.toLowerCase().includes(q.toLowerCase()) ||
     (e.designationName ?? "").toLowerCase().includes(q.toLowerCase()) ||
     (e.departmentName ?? "").toLowerCase().includes(q.toLowerCase())
-=======
-  const { data, loading, refreshing, refresh } = useFetch<{ data: Employee[] }>(
-    "employees.list", { page: 1, limit: 50 }
-  );
-
-  const list = (data?.data ?? []).filter(e =>
-    !q || e.fullName.toLowerCase().includes(q.toLowerCase()) ||
-    e.code.toLowerCase().includes(q.toLowerCase()) ||
-    (e.designation ?? "").toLowerCase().includes(q.toLowerCase())
->>>>>>> origin/main
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <LinearGradient colors={["#4F46E5", "#6366F1"]} style={styles.header}>
-<<<<<<< HEAD
         <Text style={styles.title}>Directory</Text>
         <Text style={styles.sub}>{data?.length ?? "—"} colleagues</Text>
-=======
-        <Text style={styles.title}>Employees</Text>
-        <Text style={styles.sub}>{data?.data?.length ?? "—"} members</Text>
->>>>>>> origin/main
         <View style={styles.searchBar}>
           <Ionicons name="search" size={16} color={Colors.textTertiary} style={{ marginRight: 8 }} />
           <TextInput
@@ -95,7 +69,6 @@ export default function EmployeesScreen() {
             <View style={{ flex: 1, marginLeft: Spacing.md }}>
               <Text style={Typography.h4} numberOfLines={1}>{emp.fullName}</Text>
               <Text style={Typography.bodyS} numberOfLines={1}>
-<<<<<<< HEAD
                 {emp.designationName ?? "—"}{emp.departmentName ? ` · ${emp.departmentName}` : ""}
               </Text>
               <Text style={[Typography.caption, { marginTop: 2 }]}>
@@ -103,13 +76,6 @@ export default function EmployeesScreen() {
               </Text>
             </View>
             {emp.sameDepartment ? <Badge label="My Dept" /> : emp.sameBranch ? <Badge label="My Branch" /> : null}
-=======
-                {emp.designation ?? "—"}{emp.department ? ` · ${emp.department}` : ""}
-              </Text>
-              <Text style={[Typography.caption, { marginTop: 2 }]}>{emp.code}</Text>
-            </View>
-            <Badge label={emp.status} />
->>>>>>> origin/main
           </Card>
         )}
       />

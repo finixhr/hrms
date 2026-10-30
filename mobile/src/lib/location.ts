@@ -22,7 +22,6 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (!latest) return;
 
   try {
-<<<<<<< HEAD
     // Schema S.trackingLocation (validation.ts:508): accuracyM / clientTimestamp /
     // clientEventId — the old `accuracy`/`timestamp` fields were silently
     // stripped by the server's Zod whitelist and never arrived.
@@ -32,13 +31,6 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
       accuracyM: latest.coords.accuracy ?? null,
       clientTimestamp: new Date(latest.timestamp).toISOString(),
       clientEventId: `${LOCATION_TASK_NAME}-${latest.timestamp}`,
-=======
-    await rpc("tracking.location", {
-      latitude: latest.coords.latitude,
-      longitude: latest.coords.longitude,
-      accuracy: latest.coords.accuracy,
-      timestamp: new Date(latest.timestamp).toISOString(),
->>>>>>> origin/main
     });
   } catch (err) {
     // Non-fatal — server will retry via next update
@@ -106,7 +98,6 @@ export async function getCurrentLocation(): Promise<{ latitude: number; longitud
   });
   return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
 }
-<<<<<<< HEAD
 
 /** One-shot location including accuracy in metres (geo-fence punch schema S.geoCheckin
  *  takes `accuracyM`). Returns null when permission is denied or no fix is available. */
@@ -127,5 +118,3 @@ export async function getLocationWithAccuracy(): Promise<{ latitude: number; lon
     return null;
   }
 }
-=======
->>>>>>> origin/main

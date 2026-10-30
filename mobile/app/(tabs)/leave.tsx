@@ -6,15 +6,10 @@ import {
   Platform, StatusBar, Alert, TouchableOpacity,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-<<<<<<< HEAD
-=======
-import { Ionicons } from "@expo/vector-icons";
->>>>>>> origin/main
 import { rpc, ApiError } from "@/src/lib/api";
 import { Card, Button, Badge, Input, SectionHeader, EmptyState } from "@/src/components/ui";
 import { Colors, Spacing, Typography, Radius } from "@/src/theme";
 
-<<<<<<< HEAD
 interface LeaveType   { id: string; name: string; code?: string; active?: boolean }
 // ess.leave contract (src/hrm-server/routes/ess.ts:81):
 //   { balances: [{ leaveTypeId, typeName, remaining, … }],
@@ -22,11 +17,6 @@ interface LeaveType   { id: string; name: string; code?: string; active?: boolea
 //     requests: [{ id, fromDate, toDate, typeName, status, reason, … }] }
 interface LeaveReq    { id: string; typeName?: string; fromDate: string; toDate: string; status: string; reason?: string }
 interface LeaveBalance { leaveTypeId: string; typeName: string; remaining: number; used?: number; entitled?: number }
-=======
-interface LeaveType   { id: string; name: string; balance?: number; color?: string }
-interface LeaveReq    { id: string; leaveTypeName?: string; startDate: string; endDate: string; status: string; reason: string; days?: number }
-interface LeaveBalance { leaveTypeId: string; leaveTypeName: string; balance: number; used: number; total: number; color?: string }
->>>>>>> origin/main
 
 export default function LeaveScreen() {
   const [types, setTypes]       = useState<LeaveType[]>([]);
@@ -41,7 +31,6 @@ export default function LeaveScreen() {
   const [end, setEnd]           = useState("");
   const [reason, setReason]     = useState("");
 
-<<<<<<< HEAD
   const load = useCallback(async (_silent = false) => {
     try {
       // One self-scoped call replaces the three broken ones: balances +
@@ -51,18 +40,6 @@ export default function LeaveScreen() {
       setTypes(res?.types ?? []);
       setRequests(res?.requests ?? []);
       if (!selType && res?.types?.length) setSelType(res.types[0].id);
-=======
-  const load = useCallback(async (silent = false) => {
-    try {
-      const [t, b, r] = await Promise.allSettled([
-        rpc<LeaveType[]>("leaveTypes.list", {}),
-        rpc<LeaveBalance[]>("leaveRequests.myBalances", {}),
-        rpc<{ data: LeaveReq[] }>("leaveRequests.myRequests", { page: 1 }),
-      ]);
-      if (t.status === "fulfilled") { setTypes(t.value); if (!selType && t.value.length) setSelType(t.value[0].id); }
-      if (b.status === "fulfilled") setBalances(b.value ?? []);
-      if (r.status === "fulfilled") setRequests(r.value.data ?? []);
->>>>>>> origin/main
     } finally { setRefreshing(false); }
   }, [selType]);
 
@@ -72,12 +49,8 @@ export default function LeaveScreen() {
     if (!selType || !start || !end || !reason.trim()) { Alert.alert("Required", "Please fill in all fields."); return; }
     setSubmitting(true);
     try {
-<<<<<<< HEAD
       // Server schema S.leaveApply (validation.ts:225) requires fromDate/toDate.
       await rpc("leaveRequests.apply", { leaveTypeId: selType, fromDate: start, toDate: end, reason });
-=======
-      await rpc("leaveRequests.apply", { leaveTypeId: selType, startDate: start, endDate: end, reason });
->>>>>>> origin/main
       setShowForm(false); setReason(""); setStart(""); setEnd("");
       load(true);
     } catch (e) { Alert.alert("Error", e instanceof ApiError ? e.message : "Submission failed"); }
@@ -98,13 +71,8 @@ export default function LeaveScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: Spacing.md }}>
           {balances.map(b => (
             <View key={b.leaveTypeId} style={styles.balPill}>
-<<<<<<< HEAD
               <Text style={styles.balVal}>{b.remaining}</Text>
               <Text style={styles.balLabel}>{b.typeName}</Text>
-=======
-              <Text style={styles.balVal}>{b.balance}</Text>
-              <Text style={styles.balLabel}>{b.leaveTypeName}</Text>
->>>>>>> origin/main
             </View>
           ))}
           {balances.length === 0 && types.map(t => (
@@ -176,15 +144,9 @@ export default function LeaveScreen() {
               <Card key={r.id}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <View style={{ flex: 1 }}>
-<<<<<<< HEAD
                     <Text style={Typography.h4}>{r.typeName ?? "Leave"}</Text>
                     <Text style={[Typography.bodyS, { marginTop: 2 }]}>
                       {r.fromDate} → {r.toDate}
-=======
-                    <Text style={Typography.h4}>{r.leaveTypeName ?? "Leave"}</Text>
-                    <Text style={[Typography.bodyS, { marginTop: 2 }]}>
-                      {r.startDate} → {r.endDate}{r.days ? ` · ${r.days}d` : ""}
->>>>>>> origin/main
                     </Text>
                     <Text style={[Typography.bodyS, { marginTop: 4 }]} numberOfLines={2}>{r.reason}</Text>
                   </View>

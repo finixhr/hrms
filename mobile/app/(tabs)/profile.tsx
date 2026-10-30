@@ -7,11 +7,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/src/lib/auth";
-<<<<<<< HEAD
 import { Avatar, Card } from "@/src/components/ui";
-=======
-import { Avatar, Card, Button } from "@/src/components/ui";
->>>>>>> origin/main
 import { Colors, Spacing, Typography, Radius } from "@/src/theme";
 import { useState } from "react";
 
@@ -66,11 +62,7 @@ function SettingSection({ title, rows }: { title: string; rows: SettingRow[] }) 
 }
 
 export default function ProfileScreen() {
-<<<<<<< HEAD
   const { user, logout } = useAuthStore();
-=======
-  const { user, logout, isLoading } = useAuthStore();
->>>>>>> origin/main
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -127,11 +119,7 @@ export default function ProfileScreen() {
         <View style={styles.infoChip}>
           <Ionicons name="business-outline" size={14} color={Colors.primary} />
           <Text style={[Typography.caption, { color: Colors.primary }]}>Vendor ID</Text>
-<<<<<<< HEAD
           <Text style={[Typography.label, { color: Colors.primary }]}>{(user.vendorId ?? "—").slice(0, 8)}…</Text>
-=======
-          <Text style={[Typography.label, { color: Colors.primary }]}>{user.vendorId.slice(0, 8)}…</Text>
->>>>>>> origin/main
         </View>
         <View style={styles.infoChip}>
           <Ionicons name="id-card-outline" size={14} color={Colors.accent} />

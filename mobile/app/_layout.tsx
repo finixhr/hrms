@@ -4,16 +4,10 @@ import { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
-<<<<<<< HEAD
 import { useAuthStore, type AuthUser } from "@/src/lib/auth";
 import { getToken, rpc } from "@/src/lib/api";
 import { registerForPushNotifications } from "@/src/lib/push";
 import { initOutbox, resumeAfterLogin } from "@/src/lib/offline";
-=======
-import { useAuthStore } from "@/src/lib/auth";
-import { getToken, getBaseUrl } from "@/src/lib/api";
-import { registerForPushNotifications } from "@/src/lib/push";
->>>>>>> origin/main
 import { Colors } from "@/src/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -28,7 +22,6 @@ export default function RootLayout() {
       try {
         const token = await getToken();
         if (token) {
-<<<<<<< HEAD
           // Session restore goes through the shared RPC client so behavior is
           // identical to every other call: an HTTP 401 clears the stale token
           // (rpc() does it) and the auth guard below routes to login, while a
@@ -55,31 +48,6 @@ export default function RootLayout() {
     if (user?.id) resumeAfterLogin().catch(() => {});
   }, [user?.id]);
 
-=======
-          const res = await fetch(
-            `${getBaseUrl()}/api/hrm`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-                "X-Requested-With": "XMLHttpRequest",
-              },
-              body: JSON.stringify({ action: "auth.me", payload: {} }),
-            },
-          );
-          if (res.ok) {
-            const data = (await res.json()) as { user: Parameters<typeof setUser>[0] };
-            setUser(data.user, token);
-          }
-        }
-      } catch { /* ignore — login screen will show */ } finally {
-        await SplashScreen.hideAsync();
-      }
-    })();
-  }, []);
-
->>>>>>> origin/main
   useEffect(() => {
     if (user) registerForPushNotifications().catch(() => {});
   }, [user?.id]);

@@ -25,7 +25,6 @@ export function useFetch<T>(
 
   useEffect(() => { mounted.current = true;  return () => { mounted.current = false; }; }, []);
 
-<<<<<<< HEAD
   // T-11 — dependency lists must be simple expressions (no inline
   // JSON.stringify, no spread): the serialized payload stays the cache key
   // (stable across renders even when the payload object identity changes),
@@ -34,8 +33,6 @@ export function useFetch<T>(
   const payloadKey = JSON.stringify(payload ?? {});
   const extraKey = JSON.stringify(deps);
 
-=======
->>>>>>> origin/main
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setError(null);
@@ -47,15 +44,9 @@ export function useFetch<T>(
     } finally {
       if (mounted.current) { setLoading(false); setRefreshing(false); }
     }
-<<<<<<< HEAD
   }, [action, payloadKey]);
 
   useEffect(() => { load(); }, [load, extraKey]);
-=======
-  }, [action, JSON.stringify(payload)]);
-
-  useEffect(() => { load(); }, [load, ...deps]);
->>>>>>> origin/main
 
   const refresh = useCallback(() => { setRefreshing(true); load(true); }, [load]);
 

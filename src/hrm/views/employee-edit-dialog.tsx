@@ -10,11 +10,7 @@
 // 6. Interactive helpers: live Age badge, Bangladesh NID/e-TIN format checks,
 //    address auto-mirroring switch, and 7-day weekly off chips with presets.
 
-<<<<<<< HEAD
 import { useState, useEffect, useMemo, useCallback } from "react"
-=======
-import { useState, useEffect, useRef, useMemo, useCallback } from "react"
->>>>>>> origin/main
 import {
   UserRound, Users, ShieldCheck, MapPin, Briefcase, CalendarRange,
   CalendarClock, Banknote, AlertCircle, AlertTriangle,
@@ -516,37 +512,24 @@ export function EditEmployeeDialog({ open, onOpenChange, employee, lookups, onSa
   }, [employee])
 
   const [formValues, setFormValues] = useState<Record<string, any>>(buildInitialValues)
-<<<<<<< HEAD
   // T-11 — the initial-values snapshot is STATE (read during render by the
   // isDirty memo), not a ref: ref reads during render are what the
   // react-hooks/refs rule forbids. Writers are the sync-effect below and the
   // submit handler — both legal mutation points.
   const [initialSnapshot, setInitialSnapshot] = useState(() => JSON.stringify(buildInitialValues()))
-=======
-  const initialRef = useRef<string>(JSON.stringify(buildInitialValues()))
->>>>>>> origin/main
 
   useEffect(() => {
     const fresh = buildInitialValues()
     setFormValues(fresh)
-<<<<<<< HEAD
     setInitialSnapshot(JSON.stringify(fresh))
-=======
-    initialRef.current = JSON.stringify(fresh)
->>>>>>> origin/main
     setAttemptedSubmit(false)
     setServerError(null)
   }, [buildInitialValues])
 
   // Track dirty status
   const isDirty = useMemo(() => {
-<<<<<<< HEAD
     return JSON.stringify(formValues) !== initialSnapshot
   }, [formValues, initialSnapshot])
-=======
-    return JSON.stringify(formValues) !== initialRef.current
-  }, [formValues])
->>>>>>> origin/main
 
   // Validation output computed in real time
   const validation = useMemo(() => {
@@ -712,11 +695,7 @@ export function EditEmployeeDialog({ open, onOpenChange, employee, lookups, onSa
 
       await rpc("employees.update", { id: employee.id, ...payload })
       toast("Employee profile updated successfully", "ok")
-<<<<<<< HEAD
       setInitialSnapshot(JSON.stringify(formValues))
-=======
-      initialRef.current = JSON.stringify(formValues)
->>>>>>> origin/main
       onOpenChange(false)
       if (onSaved) onSaved()
     } catch (err: any) {

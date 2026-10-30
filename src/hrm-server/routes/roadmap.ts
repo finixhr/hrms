@@ -285,7 +285,6 @@ route("reimbursements.list", {
       where.employeeId = { in: (await db.employee.findMany({ where: scope, select: { id: true } })).map((e) => e.id) }
     }
     if (p?.month) where.date = { gte: `${p.month}-01`, lte: `${p.month}-31` }
-<<<<<<< HEAD
     // V1-002 — exclude large receiptData bytes from list payloads.
     // T-10 (2026-10-30): this handler used to return the { items, total, … }
     // envelope UNCONDITIONALLY, which broke every legacy caller — the web
@@ -295,9 +294,6 @@ route("reimbursements.list", {
     // paginated list: explicit page/pageSize → paged envelope; absent → the
     // legacy full-array contract (still without receiptData bytes).
     const paged = p?.page != null || p?.pageSize != null
-=======
-    // V1-002 — paginate and exclude large receiptData bytes from list
->>>>>>> origin/main
     const pageSize = Math.min(200, Math.max(1, Number(p?.pageSize) || 100))
     const page = Math.max(1, Number(p?.page) || 1)
     const listSelect = {
@@ -308,15 +304,10 @@ route("reimbursements.list", {
       approvedBy: true, actedAt: true, journalId: true, createdAt: true,
     } as const
     const [list, total] = await Promise.all([
-<<<<<<< HEAD
       paged
         ? db.expenseClaim.findMany({ where, orderBy: [{ date: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize, select: listSelect })
         : db.expenseClaim.findMany({ where, orderBy: { date: "desc" }, select: listSelect }),
       paged ? db.expenseClaim.count({ where }) : Promise.resolve(null as unknown as number),
-=======
-      db.expenseClaim.findMany({ where, orderBy: { date: "desc" }, skip: (page - 1) * pageSize, take: pageSize, select: listSelect }),
-      db.expenseClaim.count({ where }),
->>>>>>> origin/main
     ])
     const empIds = [...new Set(list.map((c) => c.employeeId))]
     const employees = empIds.length
@@ -329,11 +320,7 @@ route("reimbursements.list", {
       employeeCode: empById.get(c.employeeId)?.code,
       reimbursementStatus: c.reimbursementDate ? "REIMBURSED" : "APPROVED",
     }))
-<<<<<<< HEAD
     return paged ? { items, total, page, pageSize } : items
-=======
-    return { items, total, page, pageSize }
->>>>>>> origin/main
   },
 })
 /** Mark an approved claim reimbursed: stamps the date, posts the cash journal. */

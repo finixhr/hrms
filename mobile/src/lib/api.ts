@@ -85,7 +85,6 @@ export async function rpc<T = unknown>(
   }
 
   if (!res.ok) {
-<<<<<<< HEAD
     // Server error body is { ok: false, error: <human message>, code: <http> }
     // — the actionable text (policy denials, sequence guards, quota reasons)
     // lives in `error`. M3: display THAT, not a generic "Request failed (N)"
@@ -94,12 +93,6 @@ export async function rpc<T = unknown>(
     throw new ApiError(
       b?.error ? `HTTP_${res.status}` : "SERVER_ERROR",
       b?.error ?? b?.message ?? `Request failed (${res.status})`,
-=======
-    const b = body as { error?: string; message?: string };
-    throw new ApiError(
-      b?.error ?? "SERVER_ERROR",
-      b?.message ?? `Request failed (${res.status})`,
->>>>>>> origin/main
       res.status,
     );
   }

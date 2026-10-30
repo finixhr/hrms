@@ -14,11 +14,7 @@
 //   - the server additionally returns a fieldErrors map (mirroring its zod
 //     issues) which is applied the same way after a rejected submission
 import Link from "next/link"
-<<<<<<< HEAD
 import { cloneElement, useId, useMemo, useRef, useState, useCallback, type ReactElement, type FormEvent, type ComponentProps } from "react"
-=======
-import { cloneElement, useId, useMemo, useRef, useState, type ReactElement, type FormEvent, type ComponentProps } from "react"
->>>>>>> origin/main
 import { useSearchParams } from "next/navigation"
 import {
   ArrowRight, Building2, CheckCircle2, ChevronRight, Eye, EyeOff, Loader2, Lock, ShieldCheck, UserRound,
@@ -172,7 +168,6 @@ export function RegisterForm({ plans, registrationEnabled, messageOnSubmit }: {
   // live refs to every validatable input so we can scroll/focus after the
   // failed-submit re-render without waiting an effect tick
   const inputRefs = useRef<Partial<Record<FieldKey, HTMLElement | null>>>({})
-<<<<<<< HEAD
   // useCallback keeps the factory stable across renders — every `ref={…}`
   // below receives a fresh-but-equivalent callback, which the React Compiler
   // can prove is a ref callback (not a render-time ref access)
@@ -182,9 +177,6 @@ export function RegisterForm({ plans, registrationEnabled, messageOnSubmit }: {
     },
     [],
   )
-=======
-  const setInputRef = (key: FieldKey) => (el: any) => { inputRefs.current[key] = el }
->>>>>>> origin/main
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setF((s) => ({ ...s, [k]: v }))

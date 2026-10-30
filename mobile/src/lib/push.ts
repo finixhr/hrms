@@ -7,7 +7,6 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
-<<<<<<< HEAD
 import * as SecureStore from "expo-secure-store";
 import { rpc } from "./api";
 
@@ -15,10 +14,6 @@ import { rpc } from "./api";
 // (push.unregisterDevice REQUIRES { token } — see routes/push.ts schema).
 const PUSH_TOKEN_KEY = "finixhr_push_token";
 
-=======
-import { rpc } from "./api";
-
->>>>>>> origin/main
 // Show notifications even when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -69,7 +64,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
   const expoPushToken = tokenData.data;
 
   // Register with server
-<<<<<<< HEAD
   // CONTRACT (routes/push.ts): platform is enum ["expo" | "fcm" | "apns"] —
   // an Expo push token registers as "expo" (the schema default). The old
   // code sent Platform.OS ("android"/"ios"), which failed enum validation,
@@ -77,13 +71,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
   try {
     await rpc("push.registerDevice", { token: expoPushToken });
     await SecureStore.setItemAsync(PUSH_TOKEN_KEY, expoPushToken);
-=======
-  try {
-    await rpc("push.registerDevice", {
-      token: expoPushToken,
-      platform: Platform.OS, // "android" | "ios"
-    });
->>>>>>> origin/main
     console.log("[push] Registered device token:", expoPushToken);
   } catch (err) {
     console.error("[push] Failed to register device token:", err);
@@ -93,7 +80,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
-<<<<<<< HEAD
 // Unregister device (logout) — sends the REQUIRED token field
 // ---------------------------------------------------------------------------
 
@@ -117,8 +103,6 @@ export async function unregisterPushNotifications(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-=======
->>>>>>> origin/main
 // Notification response handler (user tapped notification)
 // ---------------------------------------------------------------------------
 

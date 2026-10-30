@@ -168,11 +168,7 @@ route("tracking.history", {
     const [points, totalPoints, events] = await Promise.all([
       db.trackingPoint.findMany({
         where: { vendorId: ctx.vendorId, employeeId: p.employeeId, timestamp: { gte: from, lte: to } },
-<<<<<<< HEAD
         orderBy: [{ timestamp: "asc" }, { id: "asc" }],
-=======
-        orderBy: { timestamp: "asc" },
->>>>>>> origin/main
         skip: (page - 1) * size,
         take: size,
       }),
@@ -538,11 +534,7 @@ route("attendance.events.list", {
     const size = Math.min(p.size ?? 100, 200)
     const page = p.page ?? 1
     const [events, total] = await Promise.all([
-<<<<<<< HEAD
       db.attendanceEvent.findMany({ where, orderBy: [{ occurredAt: "desc" }, { id: "asc" }], skip: (page - 1) * size, take: size }),
-=======
-      db.attendanceEvent.findMany({ where, orderBy: { occurredAt: "desc" }, skip: (page - 1) * size, take: size }),
->>>>>>> origin/main
       db.attendanceEvent.count({ where }),
     ])
     // enrich with employee names (list payload — no selfie bytes, §26)

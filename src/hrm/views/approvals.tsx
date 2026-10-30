@@ -1286,14 +1286,10 @@ function DelegationTab() {
   const [open, setOpen] = useState(false)
   const [toEmail, setToEmail] = useState("")
   const [startDate, setStartDate] = useState(todayDhaka())
-<<<<<<< HEAD
   // T-11 — one-time default (today + 7d) evaluated once per mount via the
   // lazy initializer; not a per-render impurity the purity rule guards
   // against (a plain `new Date(...)` in the render body would be).
   const [endDate, setEndDate] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10))
-=======
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10))
->>>>>>> origin/main
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
   // M-03 — proper ConfirmDialog replaces the browser's window.confirm

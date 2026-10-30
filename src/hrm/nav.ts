@@ -9,11 +9,7 @@
 import { LayoutDashboard, CalendarDays, Users, Building2, Clock, Timer, Plane, Wallet,
   Landmark, Receipt, HandCoins, TrendingUp, TrendingDown, ListChecks, CheckCircle2, Bell, Megaphone, MailPlus,
   FileText, LogOut, UserRound, FileBarChart, BarChart3, ShieldCheck, Settings, Network, GitBranch,
-<<<<<<< HEAD
   Landmark as TaxIcon, ShoppingCart, Boxes, Cctv, UserPlus, MapPin, Bot,
-=======
-  Landmark as TaxIcon, ShoppingCart, Boxes, Cctv, Sparkles, UserPlus, MapPin, Bot,
->>>>>>> origin/main
   CalendarClock, MonitorSmartphone, Radar, Gift, PiggyBank,
   BookOpen, FilePenLine, Settings2, LifeBuoy } from "lucide-react"
 

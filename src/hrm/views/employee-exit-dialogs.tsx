@@ -363,13 +363,9 @@ export function RetireEmployeeDialog({
   const [createExitClearance, setCreateExitClearance] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-<<<<<<< HEAD
   // V3-008: typed confirm guard — retirement flow never wired the guard UI;
   // kept (underscore) so the intent survives until it lands.
   const [_confirmText, _setConfirmText] = useState("")
-=======
-  const [confirmText, setConfirmText] = useState("") // V3-008: typed confirm guard
->>>>>>> origin/main
 
   if (!employee) return null
 

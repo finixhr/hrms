@@ -135,11 +135,7 @@ route("leaveBalances.list", {
     const page = Math.max(1, Number(p?.page) || 1)
     const [balances, total] = paged
       ? await Promise.all([
-<<<<<<< HEAD
           db.leaveBalance.findMany({ where, orderBy: [{ year: "desc" }, { employeeId: "asc" }, { leaveTypeId: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
-=======
-          db.leaveBalance.findMany({ where, skip: (page - 1) * pageSize, take: pageSize }),
->>>>>>> origin/main
           db.leaveBalance.count({ where }),
         ])
       : [await db.leaveBalance.findMany({ where }), null]
@@ -192,11 +188,7 @@ route("leaveRequests.list", {
     const page = Math.max(1, Number(p?.page) || 1)
     const [list, total] = paged
       ? await Promise.all([
-<<<<<<< HEAD
           db.leaveRequest.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
-=======
-          db.leaveRequest.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
->>>>>>> origin/main
           db.leaveRequest.count({ where }),
         ])
       : [await db.leaveRequest.findMany({ where, orderBy: { createdAt: "desc" } }), null]

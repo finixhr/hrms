@@ -9,16 +9,12 @@ import { mkVendor, mkUser, mkEmployee, makeCtx, uniq } from "./_fixtures"
 import { getRoute } from "@/hrm-server/routes/router"
 
 describe("FE-1 employees.refList — lightweight picker directory", () => {
-<<<<<<< HEAD
   // T-10 (2026-10-30): the picker directory intentionally gained `status`
   // (R6/R7 pickers filter by employment status — inventory.tsx:736,
   // fieldforce.tsx:142, loans.tsx:156, leave.tsx:268 read e.status off the
   // cached useEmployeeDirectory rows). The key pin below was widened to
   // match the live contract; the sensitive-field exclusions still hold.
   test("returns id/code/fullName/status only, ordered, with total + truncated flag", async () => {
-=======
-  test("returns id/code/fullName only, ordered, with total + truncated flag", async () => {
->>>>>>> origin/main
     const v = await mkVendor()
     await mkEmployee(v.id, { fullName: "Ref Alpha" })
     await mkEmployee(v.id, { fullName: "Ref Beta" })
@@ -28,11 +24,7 @@ describe("FE-1 employees.refList — lightweight picker directory", () => {
     expect(res.truncated).toBe(false)
     const row = res.refs.find((r: any) => r.fullName === "Ref Alpha")
     expect(row).toBeTruthy()
-<<<<<<< HEAD
     expect(Object.keys(row!).sort()).toEqual(["code", "fullName", "id", "status"])
-=======
-    expect(Object.keys(row!).sort()).toEqual(["code", "fullName", "id"])
->>>>>>> origin/main
     // no photo/contact columns ever leave the server
     expect((row as any).photoUrl).toBeUndefined()
     expect((row as any).mobile).toBeUndefined()

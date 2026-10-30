@@ -59,7 +59,6 @@ export function useOwnerApi<T = any>(action: string | null, payload?: Record<str
   const [loading, setLoading] = useState(!!action)
   const [error, setError] = useState<string | null>(null)
 
-<<<<<<< HEAD
   // T-11 — the React Compiler's hook rules require dependency lists of
   // simple expressions: no inline JSON.stringify() calls, no spreads. The
   // serialized payload stays the cache key (stable across renders even when
@@ -67,8 +66,6 @@ export function useOwnerApi<T = any>(action: string | null, payload?: Record<str
   // serialized key that merely TRIGGERS the effect — load() does the work.
   const payloadKey = JSON.stringify(payload || {})
   const extraKey = JSON.stringify(deps)
-=======
->>>>>>> origin/main
   const load = useCallback(async () => {
     if (!action) return
     setLoading(true)
@@ -81,13 +78,8 @@ export function useOwnerApi<T = any>(action: string | null, payload?: Record<str
     } finally {
       setLoading(false)
     }
-<<<<<<< HEAD
 
   }, [action, payloadKey, extraKey])
-=======
-     
-  }, [action, JSON.stringify(payload || {}), ...deps])
->>>>>>> origin/main
 
   useEffect(() => { load() }, [load])
   return { data, loading, error, reload: load, setData }

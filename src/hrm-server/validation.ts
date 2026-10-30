@@ -281,15 +281,12 @@ export const S = {
     clientTimestamp: z.string().max(40).nullish(),
     isMockLocation: flag,
     reason: textOpt(300),
-<<<<<<< HEAD
     // M3 (T-12) — true when the mobile outbox recorded this punch on-device
     // while offline and is replaying it after reconnect. The punch stays real
     // (GPS/clientTimestamp captured at punch time), but a material delay
     // flags the event OFFLINE_CAPTURE for HR review — see
     // routes/attendance.ts offlineCaptureVerdict.
     offlineCapture: flag,
-=======
->>>>>>> origin/main
   }).passthrough(),
 
   // §28 selfie check-in: the selfie PROOF is the requirement; GPS is
@@ -314,11 +311,8 @@ export const S = {
     clientTimestamp: z.string().max(40).nullish(),
     isMockLocation: flag,
     reason: textOpt(300),
-<<<<<<< HEAD
     // M3 (T-12) — offline outbox replay marker (see S.geoCheckin note)
     offlineCapture: flag,
-=======
->>>>>>> origin/main
   }).passthrough(),
 
   geoCheckout: z.object({
@@ -339,11 +333,8 @@ export const S = {
     clientTimestamp: z.string().max(40).nullish(),
     isMockLocation: flag,
     reason: textOpt(300),
-<<<<<<< HEAD
     // M3 (T-12) — offline outbox replay marker (see S.geoCheckin note)
     offlineCapture: flag,
-=======
->>>>>>> origin/main
   }).passthrough(),
 
   selfCheckout: z.object({

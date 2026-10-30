@@ -1,5 +1,4 @@
 // Auth state — Zustand store with persist via expo-secure-store
-<<<<<<< HEAD
 // Handles login, MFA, logout and token management.
 //
 // CONTRACT (src/hrm-server/routes/auth.ts + src/hrm-server/auth.ts):
@@ -14,12 +13,6 @@
 import { create } from "zustand";
 import { rpc, saveToken, clearToken, ApiError } from "./api";
 import { unregisterPushNotifications } from "./push";
-=======
-// Handles login, MFA, logout and token management
-
-import { create } from "zustand";
-import { rpc, saveToken, clearToken, ApiError } from "./api";
->>>>>>> origin/main
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,26 +23,18 @@ export interface AuthUser {
   name: string;
   email: string;
   role: string;
-<<<<<<< HEAD
   roleLabel?: string;
   employeeId?: string | null;
   vendorId?: string;
   permissions?: string[];
-=======
-  vendorId: string;
->>>>>>> origin/main
 }
 
 interface AuthState {
   user: AuthUser | null;
   token: string | null;
   mfaPending: boolean;
-<<<<<<< HEAD
   mfaToken: string | null;
   mfaEnrollmentRequired: boolean;
-=======
-  mfaTempToken: string | null;
->>>>>>> origin/main
   isLoading: boolean;
   error: string | null;
 
@@ -68,17 +53,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
   token: null,
   mfaPending: false,
-<<<<<<< HEAD
   mfaToken: null,
   mfaEnrollmentRequired: false,
-=======
-  mfaTempToken: null,
->>>>>>> origin/main
   isLoading: false,
   error: null,
 
   login: async (email, password) => {
-<<<<<<< HEAD
     set({ isLoading: true, error: null, mfaEnrollmentRequired: false });
     try {
       const res = await rpc<{
@@ -109,19 +89,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       // session carrier; expires after 5 minutes).
       if (res.mfaRequired && res.mfaToken) {
         set({ mfaPending: true, mfaToken: res.mfaToken, isLoading: false });
-=======
-    set({ isLoading: true, error: null });
-    try {
-      const res = await rpc<{
-        token?: string;
-        mfaRequired?: boolean;
-        tempToken?: string;
-        user?: AuthUser;
-      }>("auth.login", { email, password }, { skipAuth: true });
-
-      if (res.mfaRequired && res.tempToken) {
-        set({ mfaPending: true, mfaTempToken: res.tempToken, isLoading: false });
->>>>>>> origin/main
         return { mfaRequired: true };
       }
 
@@ -140,7 +107,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   verifyMfa: async (code) => {
-<<<<<<< HEAD
     const { mfaToken } = get();
     if (!mfaToken) throw new Error("No MFA session");
     set({ isLoading: true, error: null });
@@ -149,15 +115,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const res = await rpc<{ token: string; user: AuthUser }>(
         "auth.mfa.verify",
         { mfaToken, code },
-=======
-    const { mfaTempToken } = get();
-    if (!mfaTempToken) throw new Error("No MFA session");
-    set({ isLoading: true, error: null });
-    try {
-      const res = await rpc<{ token: string; user: AuthUser }>(
-        "auth.mfa.verify",
-        { token: mfaTempToken, code },
->>>>>>> origin/main
         { skipAuth: true },
       );
       await saveToken(res.token);
@@ -165,11 +122,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         user: res.user,
         token: res.token,
         mfaPending: false,
-<<<<<<< HEAD
         mfaToken: null,
-=======
-        mfaTempToken: null,
->>>>>>> origin/main
         isLoading: false,
       });
     } catch (err) {
@@ -182,26 +135,17 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   logout: async () => {
     set({ isLoading: true });
     try {
-<<<<<<< HEAD
       // Best-effort: unregister the push token before clearing auth. Sends the
       // REQUIRED { token } field (was: empty payload → always 400 → swallowed).
       await unregisterPushNotifications().catch(() => null);
-=======
-      // Best-effort: unregister push token before clearing auth
-      await rpc("push.unregisterDevice", {}).catch(() => null);
->>>>>>> origin/main
     } finally {
       await clearToken();
       set({
         user: null,
         token: null,
         mfaPending: false,
-<<<<<<< HEAD
         mfaToken: null,
         mfaEnrollmentRequired: false,
-=======
-        mfaTempToken: null,
->>>>>>> origin/main
         isLoading: false,
         error: null,
       });

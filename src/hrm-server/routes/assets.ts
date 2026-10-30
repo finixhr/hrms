@@ -152,15 +152,9 @@ route("assets.list", {
     const page = v.page || 1
     const pageSize = v.pageSize || 50
     const orderBy: Record<string, string>[] =
-<<<<<<< HEAD
       v.sortBy === "warranty" ? [{ warrantyExpiry: "asc" }, { code: "asc" }, { id: "asc" }]
       : v.sortBy === "recent" ? [{ createdAt: "desc" }, { id: "asc" }]
       : [{ code: "asc" }, { id: "asc" }]
-=======
-      v.sortBy === "warranty" ? [{ warrantyExpiry: "asc" }, { code: "asc" }]
-      : v.sortBy === "recent" ? [{ createdAt: "desc" }]
-      : [{ code: "asc" }]
->>>>>>> origin/main
 
     const [rows, total] = await Promise.all([
       db.asset.findMany({ where, orderBy, skip: (page - 1) * pageSize, take: pageSize }),

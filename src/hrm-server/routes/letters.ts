@@ -160,11 +160,7 @@ route("letters.list", {
     const page = Math.max(1, Number(p?.page) || 1)
     const [list, total] = paged
       ? await Promise.all([
-<<<<<<< HEAD
           db.hrLetter.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
-=======
-          db.hrLetter.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
->>>>>>> origin/main
           db.hrLetter.count({ where }),
         ])
       : [await db.hrLetter.findMany({ where, orderBy: { createdAt: "desc" } }), null]

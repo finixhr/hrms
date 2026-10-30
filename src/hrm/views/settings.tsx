@@ -3,11 +3,7 @@
 // Company profile (info + logo), HR policy groups, users, role manager with a
 // permission matrix, email/SMS gateway setup, approval workflow configuration
 // and the system self-test.
-<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react"
-=======
-import { useEffect, useMemo, useRef, useState } from "react"
->>>>>>> origin/main
 import {
   Building2, Clock, MapPin, Plane, Wallet, Cake, Workflow, AlertTriangle,
   Plus, Pencil, Trash2, Save, CheckCircle2, XCircle, ShieldCheck,
@@ -1786,7 +1782,6 @@ function FieldPermissionsTab({ settings, canEdit, onSaved }: { settings: any; ca
   const [busy, setBusy] = useState(false)
   // draft config mirrors the server shape: { roles: { role: { group: mode } }, default: { group: mode } }
   const cfg = (settings?.fieldPermissions as any) || {}
-<<<<<<< HEAD
   // T-11 — was a lazily-initialized ref MUTATED during render (the exact
   // pattern react-hooks/refs exists to forbid). The draft is component
   // state now: derived once per mount, re-derived whenever the server
@@ -1803,16 +1798,6 @@ function FieldPermissionsTab({ settings, canEdit, onSaved }: { settings: any; ca
     })
     // settings comes from useApi — stable identity until the next reload
   }, [settings])
-=======
-  const draftRef = useRef<any>(null)
-  if (draftRef.current == null) {
-    draftRef.current = {
-      roles: JSON.parse(JSON.stringify(cfg.roles || {})),
-      default: JSON.parse(JSON.stringify(cfg.default || {})),
-    }
-  }
-  const draft = draftRef.current
->>>>>>> origin/main
 
   const roleList = (roles || [])
   const effectiveRole = selectedRole || roleList[0]?.key || ""
@@ -1820,7 +1805,6 @@ function FieldPermissionsTab({ settings, canEdit, onSaved }: { settings: any; ca
   const roleEntry: Record<string, string> = editingDefault ? draft.default : (draft.roles[effectiveRole] || {})
 
   const setMode = (group: string, mode: string) => {
-<<<<<<< HEAD
     setDraft((d: any) =>
       editingDefault
         ? { ...d, default: { ...d.default, [group]: mode } }
@@ -1834,20 +1818,6 @@ function FieldPermissionsTab({ settings, canEdit, onSaved }: { settings: any; ca
       delete roles[effectiveRole]
       return { roles, default: { ...d.default } }
     })
-=======
-    if (editingDefault) draft.default[group] = mode
-    else {
-      if (!draft.roles[effectiveRole]) draft.roles[effectiveRole] = {}
-      draft.roles[effectiveRole][group] = mode
-    }
-    // force re-render (mutable draft)
-    draftRef.current = { roles: { ...draft.roles }, default: { ...draft.default } }
-  }
-
-  const clearRole = () => {
-    delete draft.roles[effectiveRole]
-    draftRef.current = { roles: { ...draft.roles }, default: { ...draft.default } }
->>>>>>> origin/main
   }
 
   const save = async () => {
@@ -1867,12 +1837,8 @@ function FieldPermissionsTab({ settings, canEdit, onSaved }: { settings: any; ca
       await rpc("settings.save", { group: "fieldPermissions", values: { roles, default: def } })
       toast("Field permissions saved — effective immediately for new reads")
       onSaved()
-<<<<<<< HEAD
       // the [settings] effect above re-derives the draft from the reloaded
       // config (was: draftRef.current = null + lazy re-init next render)
-=======
-      draftRef.current = null
->>>>>>> origin/main
     } catch (e: any) {
       toast(e.message || "Could not save field permissions", "err")
     } finally {

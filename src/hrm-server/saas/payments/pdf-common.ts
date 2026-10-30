@@ -1,11 +1,7 @@
 // ============ Shared Finix HR Corporate PDF Primitives & Branding ============
 // Provides shared WinAnsi string sanitization, vector icon renderers, image embedding,
 // and identical professional Header and Footer styling for Invoices and Money Receipts.
-<<<<<<< HEAD
 import { PDFDocument, rgb } from "pdf-lib"
-=======
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
->>>>>>> origin/main
 
 export const winAnsi = (t: any): string =>
   String(t ?? "")

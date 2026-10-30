@@ -17,20 +17,14 @@
   "dependencies": {
     "@expo/vector-icons": "~14.0.4",
     "@react-native-async-storage/async-storage": "1.23.1",
-<<<<<<< HEAD
     "@react-native-community/netinfo": "^11.4.1",
-=======
->>>>>>> origin/main
     "date-fns": "^3.6.0",
     "expo": "~52.0.0",
     "expo-camera": "~16.0.0",
     "expo-constants": "~17.0.0",
     "expo-device": "~7.0.0",
     "expo-file-system": "~18.0.0",
-<<<<<<< HEAD
     "expo-image-manipulator": "^13.0.3",
-=======
->>>>>>> origin/main
     "expo-image-picker": "~16.0.0",
     "expo-linear-gradient": "~14.0.0",
     "expo-linking": "~7.0.0",

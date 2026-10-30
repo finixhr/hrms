@@ -65,7 +65,6 @@ export function systemActor(name: string): BillingActor {
 /** Create the invoice for one billing term — idempotent and concurrency-safe.
  *  Checks for existing non-cancelled TERM invoices for the same subscription
  *  window to prevent duplicates. Catches unique constraint violations (P2002)
-<<<<<<< HEAD
  *  on concurrent requests.
  *
  *  T-10 (2026-10-30) — the concurrency repair: the old check-then-create had
@@ -79,9 +78,6 @@ export function systemActor(name: string): BillingActor {
  *  the P2002 catch stays as defense-in-depth for the day a partial unique
  *  index is added (deferred to the tech-debt register — it needs a
  *  dirty-data review before deployment). */
-=======
- *  on concurrent requests. */
->>>>>>> origin/main
 export async function createTermInvoice(input: {
   vendorId: string
   subscriptionId: string | null
@@ -95,7 +91,6 @@ export async function createTermInvoice(input: {
   actor: BillingActor
   vatRatePercent?: number
 }): Promise<{ id: string; number: string; reused?: boolean }> {
-<<<<<<< HEAD
   // Lock key mirrors the idempotency lookup: subscription invoices dedupe on
   // (subscription, window); registration invoices (nullable subscriptionId —
   // Postgres treats NULLs as distinct in unique indexes, another reason the
@@ -181,68 +176,6 @@ export async function createTermInvoice(input: {
   } catch (e: any) {
     // Unique constraint violation (concurrent insert race — defense-in-depth;
     // the advisory lock above should prevent ever reaching this branch)
-=======
-  // Idempotency check: if an active (non-cancelled) term invoice already exists for this exact term, reuse it
-  if (input.subscriptionId) {
-    const existing = await db.saasInvoice.findFirst({
-      where: {
-        subscriptionId: input.subscriptionId,
-        periodStart: input.periodStart,
-        periodEnd: input.periodEnd,
-        kind: "TERM",
-        status: { not: "CANCELLED" },
-      },
-    })
-    if (existing) {
-      if ((input.registrationId && !existing.registrationId) || (input.dueAt && !existing.dueAt)) {
-        await db.saasInvoice.update({
-          where: { id: existing.id },
-          data: {
-            registrationId: input.registrationId || existing.registrationId,
-            dueAt: input.dueAt || existing.dueAt,
-          },
-        }).catch(() => {})
-      }
-      return { id: existing.id, number: existing.number, reused: true }
-    }
-  }
-
-  try {
-    const settings = await getSaasSettings()
-    const vatRate = input.vatRatePercent !== undefined ? Number(input.vatRatePercent) : Number(settings.billing.vatRatePercent ?? 5.0)
-    const { netAmount, vatAmount } = calculateVatBreakdown(input.amount, vatRate)
-    const number = await nextInvoiceNumber()
-    const inv = await db.saasInvoice.create({
-      data: {
-        vendorId: input.vendorId,
-        subscriptionId: input.subscriptionId,
-        registrationId: input.registrationId ?? null,
-        number,
-        periodStart: input.periodStart,
-        periodEnd: input.periodEnd,
-        amount: input.amount,
-        currency: input.currency || "BDT",
-        vatRatePercent: vatRate,
-        netAmount,
-        vatAmount,
-        kind: "TERM",
-        status: "PENDING",
-        dueAt: input.dueAt ?? null,
-        notes: input.notes ?? null,
-        createdById: input.actor?.id || null,
-        createdByName: input.actor?.name || null,
-      },
-    })
-    await saasAudit(input.actor, "INVOICE_CREATED", "SaaSInvoice", inv.id,
-      `Invoice ${number} for term ${input.periodStart.toISOString().slice(0, 10)} → ${input.periodEnd.toISOString().slice(0, 10)} (BDT ${input.amount})`,
-      { vendorId: input.vendorId, metadata: { number, amount: input.amount, periodStart: input.periodStart.toISOString(), periodEnd: input.periodEnd.toISOString() } })
-    // Dispatch automated email notification with PDF attachment (best-effort background)
-    const { notifyInvoiceIssued } = await import("../notify")
-    notifyInvoiceIssued(inv.id).catch((err) => console.error("notifyInvoiceIssued background error:", err))
-    return { id: inv.id, number: inv.number, reused: false }
-  } catch (e: any) {
-    // Unique constraint violation (concurrent insert race)
->>>>>>> origin/main
     if (e?.code === "P2002" && input.subscriptionId) {
       const dupe = await db.saasInvoice.findFirst({
         where: {

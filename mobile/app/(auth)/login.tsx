@@ -9,11 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/src/lib/auth";
 import { Input, Button } from "@/src/components/ui";
-<<<<<<< HEAD
 import { Colors, Spacing, Typography, Shadow } from "@/src/theme";
-=======
-import { Colors, Spacing, Radius, Typography, Shadow } from "@/src/theme";
->>>>>>> origin/main
 
 export default function LoginScreen() {
   const { login, verifyMfa, mfaPending, isLoading, error, clearError } = useAuthStore();

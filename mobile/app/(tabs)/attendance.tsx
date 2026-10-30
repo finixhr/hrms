@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // Attendance screen — GPS check-in/out (offline outbox), selfie check-in,
 // today card, weekly summary
 //
@@ -24,19 +23,10 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   View, Text, ScrollView, RefreshControl, StyleSheet,
   Platform, StatusBar, Alert, TouchableOpacity, ActivityIndicator,
-=======
-// Attendance screen — polished GPS check-in/out, today card, weekly summary
-
-import { useState, useCallback, useEffect } from "react";
-import {
-  View, Text, ScrollView, RefreshControl, StyleSheet,
-  Platform, StatusBar, TouchableOpacity, Alert,
->>>>>>> origin/main
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { rpc, ApiError } from "@/src/lib/api";
-<<<<<<< HEAD
 import { getLocationWithAccuracy } from "@/src/lib/location";
 import { submitPunch, retryEntry, dismissEntry, removePendingEntry, useOutboxStore, type OutboxEntry } from "@/src/lib/offline";
 import { Card, Button, Badge, SectionHeader, EmptyState } from "@/src/components/ui";
@@ -49,18 +39,6 @@ interface AttRecord {
   checkIn?: string | null;
   checkOut?: string | null;
   status?: string;
-=======
-import { getCurrentLocation } from "@/src/lib/location";
-import { Card, Button, Badge, SectionHeader, EmptyState, StatChip } from "@/src/components/ui";
-import { Colors, Spacing, Typography, Radius, Shadow } from "@/src/theme";
-
-interface AttRecord {
-  id?: string;
-  checkIn?: string | null;
-  checkOut?: string | null;
-  status?: string;
-  date?: string;
->>>>>>> origin/main
   workingMinutes?: number;
   overtimeMinutes?: number;
 }
@@ -73,15 +51,12 @@ interface WeekRow {
   workingMinutes?: number;
 }
 
-<<<<<<< HEAD
 interface TrackingStatus {
   trackingEnabled?: boolean;
   attendanceMethods?: { methods?: string[]; selfieRequired?: boolean; requireGeofence?: boolean } | null;
   mandatoryGps?: { active?: boolean } | null;
 }
 
-=======
->>>>>>> origin/main
 function fmt(iso?: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -91,7 +66,6 @@ function mins2h(m?: number) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-<<<<<<< HEAD
 /** Monday of the current week, as YYYY-MM-DD. */
 function weekStart(): string {
   const d = new Date();
@@ -184,16 +158,10 @@ export default function AttendanceScreen() {
   const [week, setWeek]         = useState<WeekRow[]>([]);
   const [methods, setMethods]   = useState<string[]>([]);
   const [selfieRequired, setSelfieRequired] = useState(false);
-=======
-export default function AttendanceScreen() {
-  const [today, setToday]       = useState<AttRecord | null>(null);
-  const [week, setWeek]         = useState<WeekRow[]>([]);
->>>>>>> origin/main
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [locating, setLocating] = useState(false);
 
-<<<<<<< HEAD
   // outbox reactive state (queue + connectivity)
   const queue = useOutboxStore((s) => s.entries);
   const online = useOutboxStore((s) => s.online);
@@ -242,22 +210,11 @@ export default function AttendanceScreen() {
         setMethods(status.value?.attendanceMethods?.methods ?? []);
         setSelfieRequired(Boolean(status.value?.attendanceMethods?.selfieRequired));
       }
-=======
-  const load = useCallback(async (silent = false) => {
-    try {
-      const [t, w] = await Promise.allSettled([
-        rpc<AttRecord>("attendance.today", {}),
-        rpc<{ data: WeekRow[] }>("attendance.myWeek", {}),
-      ]);
-      if (t.status === "fulfilled") setToday(t.value);
-      if (w.status === "fulfilled") setWeek(w.value.data ?? []);
->>>>>>> origin/main
     } finally { setRefreshing(false); }
   }, []);
 
   useEffect(() => { load(); }, []);
 
-<<<<<<< HEAD
   // ---- geofence punch via the offline outbox -----------------------------
 
   const submitGeoPunch = useCallback(async (
@@ -463,32 +420,6 @@ export default function AttendanceScreen() {
   const alreadyOut = Boolean(today?.checkOut) || Boolean(pendingCheckout);
 
   const isOnline = online !== false;
-=======
-  const handleCheckin = useCallback(async () => {
-    setLocating(true);
-    const loc = await getCurrentLocation().finally(() => setLocating(false));
-    if (!loc) { Alert.alert("Location Required", "Enable location access to check in."); return; }
-    setActionLoading(true);
-    try {
-      const d = await rpc<AttRecord>("attendance.selfCheckin", { latitude: loc.latitude, longitude: loc.longitude });
-      setToday(d);
-    } catch (e) { Alert.alert("Error", e instanceof ApiError ? e.message : "Check-in failed"); }
-    finally { setActionLoading(false); }
-  }, []);
-
-  const handleCheckout = useCallback(async () => {
-    setActionLoading(true);
-    try {
-      const loc = await getCurrentLocation();
-      const d = await rpc<AttRecord>("attendance.selfCheckout", { latitude: loc?.latitude, longitude: loc?.longitude });
-      setToday(d);
-    } catch (e) { Alert.alert("Error", e instanceof ApiError ? e.message : "Check-out failed"); }
-    finally { setActionLoading(false); }
-  }, []);
-
-  const alreadyIn  = Boolean(today?.checkIn);
-  const alreadyOut = Boolean(today?.checkOut);
->>>>>>> origin/main
 
   return (
     <ScrollView
@@ -498,7 +429,6 @@ export default function AttendanceScreen() {
     >
       {/* Header */}
       <LinearGradient colors={["#4F46E5", "#06B6D4"]} style={styles.header}>
-<<<<<<< HEAD
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Attendance</Text>
           {/* Connectivity indicator — drives every offline affordance below */}
@@ -510,12 +440,6 @@ export default function AttendanceScreen() {
         <Text style={styles.headerSub}>{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</Text>
 
         {/* Today card — SERVER data only; a pending punch is labeled as pending */}
-=======
-        <Text style={styles.headerTitle}>Attendance</Text>
-        <Text style={styles.headerSub}>{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</Text>
-
-        {/* Today card */}
->>>>>>> origin/main
         <View style={styles.todayCard}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: Spacing.md }}>
             <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Today</Text>
@@ -526,20 +450,14 @@ export default function AttendanceScreen() {
               <Ionicons name="log-in-outline" size={20} color="rgba(255,255,255,0.8)" />
               <Text style={styles.tlabel}>Check-in</Text>
               <Text style={styles.tval}>{fmt(today?.checkIn)}</Text>
-<<<<<<< HEAD
               {pendingCheckin && !today?.checkIn && <Text style={styles.tpending}>pending sync</Text>}
-=======
->>>>>>> origin/main
             </View>
             <View style={styles.vDivider} />
             <View style={{ alignItems: "center" }}>
               <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.8)" />
               <Text style={styles.tlabel}>Check-out</Text>
               <Text style={styles.tval}>{fmt(today?.checkOut)}</Text>
-<<<<<<< HEAD
               {pendingCheckout && !today?.checkOut && <Text style={styles.tpending}>pending sync</Text>}
-=======
->>>>>>> origin/main
             </View>
             <View style={styles.vDivider} />
             <View style={{ alignItems: "center" }}>
@@ -548,19 +466,15 @@ export default function AttendanceScreen() {
               <Text style={styles.tval}>{mins2h(today?.workingMinutes)}</Text>
             </View>
           </View>
-<<<<<<< HEAD
           {methods.length > 0 && (
             <Text style={styles.methodHint}>
               Method policy: {methods.map((m) => (m === "GEOFENCE_SELFIE" ? "Geofence + Selfie" : m === "GEOFENCE" ? "Geofence" : m === "SELFIE" ? "Selfie" : "Device punch")).join(" · ")}
             </Text>
           )}
-=======
->>>>>>> origin/main
         </View>
       </LinearGradient>
 
       <View style={styles.body}>
-<<<<<<< HEAD
         {/* Offline explainer — only while disconnected with unsent punches */}
         {!isOnline && visibleQueue.some((e) => e.status === "pending") && (
           <View style={styles.offlineNote}>
@@ -584,9 +498,6 @@ export default function AttendanceScreen() {
         )}
 
         {/* Action buttons */}
-=======
-        {/* Action button */}
->>>>>>> origin/main
         {alreadyOut ? (
           <View style={styles.doneRow}>
             <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
@@ -612,7 +523,6 @@ export default function AttendanceScreen() {
           />
         )}
 
-<<<<<<< HEAD
         {/* Selfie check-in — policy-driven affordance (tracking.status methods) */}
         {!alreadyIn && selfieAllowed && (
           <Button
@@ -637,17 +547,11 @@ export default function AttendanceScreen() {
           </View>
         )}
 
-=======
->>>>>>> origin/main
         {/* Weekly summary */}
         <View style={{ marginTop: Spacing.xl, gap: Spacing.md }}>
           <SectionHeader title="This Week" />
           {week.length === 0 ? (
-<<<<<<< HEAD
             <Card><EmptyState icon="📅" title="No records this week" subtitle="Check in to start tracking your attendance" /></Card>
-=======
-            <Card><EmptyState icon="📅" title="No records this week" /></Card>
->>>>>>> origin/main
           ) : (
             week.map(r => (
               <Card key={r.date} style={{ flexDirection: "row", alignItems: "center", gap: Spacing.md, padding: Spacing.md }}>
@@ -669,7 +573,6 @@ export default function AttendanceScreen() {
           )}
         </View>
       </View>
-<<<<<<< HEAD
 
       {/* Selfie capture sheet — one flow serves both the dedicated selfie
           check-in and the policy-required selfie attached to a geo punch */}
@@ -701,8 +604,6 @@ export default function AttendanceScreen() {
           }
         }}
       />
-=======
->>>>>>> origin/main
     </ScrollView>
   );
 }
@@ -713,7 +614,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xxl,
   },
-<<<<<<< HEAD
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerTitle: { color: "#fff", fontSize: 24, fontWeight: "800" },
   headerSub:   { color: "rgba(255,255,255,0.7)", fontSize: 13, marginTop: 2, marginBottom: Spacing.lg },
@@ -722,10 +622,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full,
   },
   netChipText: { color: "#fff", fontSize: 10, fontWeight: "700" },
-=======
-  headerTitle: { color: "#fff", fontSize: 24, fontWeight: "800" },
-  headerSub:   { color: "rgba(255,255,255,0.7)", fontSize: 13, marginTop: 2, marginBottom: Spacing.lg },
->>>>>>> origin/main
   todayCard: {
     backgroundColor: "rgba(255,255,255,0.14)",
     borderRadius: Radius.lg,
@@ -733,15 +629,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.22)",
   },
-<<<<<<< HEAD
   methodHint: { color: "rgba(255,255,255,0.65)", fontSize: 10, marginTop: Spacing.md, textAlign: "center" },
   tlabel: { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 4 },
   tval:   { color: "#fff", fontWeight: "700", fontSize: 17, marginTop: 2 },
   tpending: { color: "#FDE68A", fontSize: 9, fontWeight: "700", marginTop: 2 },
-=======
-  tlabel: { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 4 },
-  tval:   { color: "#fff", fontWeight: "700", fontSize: 17, marginTop: 2 },
->>>>>>> origin/main
   vDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.2)", marginVertical: 4 },
   body: { padding: Spacing.lg, gap: 0 },
   doneRow: {
@@ -750,7 +641,6 @@ const styles = StyleSheet.create({
     padding: Spacing.lg, justifyContent: "center",
   },
   dayCircle: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center" },
-<<<<<<< HEAD
   offlineNote: {
     flexDirection: "row", gap: Spacing.sm, alignItems: "flex-start",
     backgroundColor: Colors.warningLight, borderRadius: Radius.md,
@@ -762,6 +652,4 @@ const styles = StyleSheet.create({
   qRetry: { color: Colors.primary, fontWeight: "700", fontSize: 12, marginTop: 6 },
   qDismiss: { color: Colors.textSecondary, fontWeight: "600", fontSize: 12, marginTop: 4 },
   qError: { color: Colors.danger, fontSize: 11, marginTop: 4, lineHeight: 15 },
-=======
->>>>>>> origin/main
 });

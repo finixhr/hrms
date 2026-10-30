@@ -193,10 +193,6 @@ export async function renderReceiptPdf(data: ReceiptPdfData): Promise<Uint8Array
 
   const colDescW = tableW - 220
   const colPeriodW = 120
-<<<<<<< HEAD
-=======
-  const colAmtW = 100
->>>>>>> origin/main
 
   // Table Header (Royal Blue Fill)
   const tblHeaderH = 20
