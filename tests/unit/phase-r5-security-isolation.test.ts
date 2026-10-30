@@ -185,6 +185,15 @@ describe("API-01 — password-grant throttle, login-audit rows, trust-gated IP",
     // asserts offending-IP thresholds on the WHOLE login-audit table; this
     // file's failure rows must not tilt its fixtures.
     await db.loginAuditLog.deleteMany({ where: { vendorId: v.id } })
+    // M4 (2026-10-30): the exhausted bucket itself must also be cleaned. The
+    // pwgrant:ip:* throttle state is DB-backed (Throttle table) and therefore
+    // shared by every LATER file in the same run — bun executes all unit
+    // files in one process against one database. Without this reset,
+    // phase3-wsd-mobile's "bad credentials" grant inherits the full bucket
+    // and receives 429 instead of 401 (deterministic full-suite failure;
+    // passes in isolation — the M3 runs crossed a 5-minute window boundary
+    // by luck). Same hermetic-suite class as the a5fc1af offending-IP fix.
+    await db.throttle.deleteMany({ where: { key: { startsWith: "pwgrant:ip:" } } })
   })
 })
 
