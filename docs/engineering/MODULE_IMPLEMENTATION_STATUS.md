@@ -12,14 +12,14 @@ Legend: **S**=server actions exist · **W**=web SPA screens · **M**=mobile nati
 
 | Module | Server | Web | Mobile | Classification & notes |
 |---|---|---|---|---|
-| Authentication (login, session, MFA verify) | ✅ 21 `auth.*` + passkeys | ✅ | ✅ rewired | **Partial→Functional**: MFA verify + session restore fixed; forced-enrollment wizard NOT native (honest redirect) → stays *Partial* until T-14 |
+| Authentication (login, session, MFA verify) | ✅ 21 `auth.*` + passkeys | ✅ | ✅ rewired + enrollment wizard (M4/T-14) | **Functional**: MFA verify + session restore fixed (first cycle); native first-login enrollment wizard delivered (M4/T-14 — 3-step QR → code → recovery-codes-once; contract-pinned). Device test outstanding (TD-26) |
 | Home dashboard | ✅ `ess.dashboard` | ✅ | ✅ rewired | **Functional (employee plane)**: personal stats + notifications; HR workforce dashboard intentionally web-only |
 | Attendance view (today/week/month) | ✅ `ess.attendance` | ✅ | ✅ rewired | **Functional** |
 | Check-in / check-out (GPS/geofence) | ✅ geofence.checkin/checkout + selfCheckout | ✅ | ✅ offline outbox (M3/T-12) | **Functional incl. offline**: punches queue on-device (`finixhr_outbox_v1`), replay with the same `clientEventId` (server-side idempotent replay, commit `dcbea29`); success shown only after server confirmation — see `OFFLINE_OUTBOX.md`. `selfCheckout` fallback stays online-only (no idempotency key in its schema) |
 | Selfie attendance | ✅ `attendance.selfie.checkin` + replay-safe proof write | ✅ (web upload flow) | ✅ native capture (M3/T-13) | **Functional**: front-camera capture → ≤640px JPEG → explicit confirm → authenticated upload; policy-required selfie attaches to geo punches; online-only by design (photo never stored on device); selfie = proof of presence, NOT identity verification (§27) |
 | Leave (balances/types/apply/history) | ✅ `ess.leave` + `leaveRequests.apply` | ✅ | ✅ rewired | **Functional**: `fromDate`/`toDate` contract fixed |
 | Payslips | ✅ `ess.payroll` + `.html` | ✅ | ✅ (was already correct) | **Functional** — HTML document rendered in WebView viewer (legitimate use) |
-| Notifications | ✅ `notifications.list/read/unreadCount` | ✅ | ✅ rewired | **Functional** (read-state display; mark-read action pending T-15 polish) |
+| Notifications | ✅ `notifications.list/read/unreadCount` | ✅ | ✅ rewired | **Functional** (read-state display; mark-read action pending polish). Push registration is now fail-closed honest (M4/T-15); real-device push E2E unverified (TD-26) |
 | Employee directory | ✅ `ess.colleagues` | ✅ | ✅ rewired | **Functional** (names + org context only — by design) |
 
 ## 2. Employee self-service (mobile Priority B)
@@ -50,17 +50,18 @@ All 40 server route modules have web SPA surfaces (`src/app/app/` + `src/hrm-ser
 | Tenant billing & payments | **Partial** — gateway routes exist (`api/payments/*`), idempotency test currently failing (T-10) |
 | Public website/CMS | **Functional** (`(public)` routes + website studio) |
 | Desktop shell | **Partial** — managed launcher + web HRM loads; CSP now set; single-instance/auto-update/window-state NOT implemented (T-22) |
-| Mobile app shell | **Functional** — expo-router, tabs, auth guard, secure storage, push scaffolding, offline outbox boot (`initOutbox` after session restore) |
+| Mobile app shell | **Functional** — expo-router, tabs, auth guard, secure storage, push scaffolding (registration now fail-closed + projectId-resolved, M4/T-15), offline outbox boot (`initOutbox` after session restore) |
 
 ## 5. Module-family coverage matrix (38 families, directive §3 Phase 5)
 
-38 module families are server-covered (566 actions); web coverage is broad; mobile covers 13 families natively after the first cycle (employee core + ESS + support + permission-gated recruitment/reports), with 10 families remaining for Priority B/C. After M3 the mobile employee core includes the offline outbox (geofence punches) and native selfie capture — the offline SELFIE path is deliberately out of scope (see `OFFLINE_OUTBOX.md` §7). No family is "blocked by backend" — the server side exists everywhere the mobile app needed it; the gaps were client-side contract failures (now fixed).
+38 module families are server-covered (566 actions); web coverage is broad; mobile covers 13 families natively after the first cycle (employee core + ESS + support + permission-gated recruitment/reports), with 10 families remaining for Priority B/C. After M3 the mobile employee core includes the offline outbox (geofence punches) and native selfie capture; after M4 it also completes the auth rail (native first-login MFA enrollment) — the offline SELFIE path is deliberately out of scope (see `OFFLINE_OUTBOX.md` §7). No family is "blocked by backend" — the server side exists everywhere the mobile app needed it; the gaps were client-side contract failures (now fixed).
 
 ---
 
 ## 6. Explicitly NOT claimed
 
-- No offline synchronization yet (T-12) — online-only with retry-safe `clientEventId`.
-- No native MFA enrollment (T-14), no selfie capture (T-13), no push E2E proof (T-15).
+- No offline synchronization beyond attendance punches (T-12 scope; leave/other actions remain online-only by design).
+- No selfie-capture, MFA-enrollment-wizard or push-registration verification on physical devices (code-complete + typecheck/contract-verified only — TD-26).
+- No real-device push E2E proof (token minted against EAS project `5df89cc1…`, registration honest — but no push has been received on a device from this codebase).
 - Reports/recruitment on mobile are intentionally permission-gated views, not full HR workbenches.
 - Desktop build verification (Windows/macOS) could not run in this sandbox — config-level changes only.

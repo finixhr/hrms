@@ -30,6 +30,57 @@ into the T-06 commit):
 
 ---
 
+## 2026-10-30 — Fourth implementation cycle (M4: GitHub integration + T-14…T-16)
+
+### Entry 17 · Baseline verification + GitHub integration · resolve the botched New-Update merge **[commit `ac022d4`]**
+- **Baseline found (not assumed)**: the sandbox recycle had destroyed `.git/objects` (refs intact, reflog showing only the GitHub clone). Recovered the M3 history from `finix-hr-main-20261030-session3.bundle` (verified complete, HEAD `b4c0f15`) into `refs/heads/m3-history`, re-fetched `origin/main`.
+- **The real state of GitHub `main` (`c172f2c` "New Update")**: a merge of the M3 tree into the release line committed WITH unresolved conflicts — 71 tracked files carried `<<<<<<< ======= >>>>>>>` markers (`bun.lock`, `next-env.d.ts`, every mobile screen the merge touched, owner-console pages, server routes) and `bun install --frozen-lockfile` + `tsc` both failed. The release line's CI could not catch it (`|| true` typecheck — TD-1/TD-01 unfixed on GitHub).
+- **Resolution evidence (no blind overwrite)**: release tip `591a82e` vs M3 vendor-drop root `e7e34eb` differ only in lockfiles + file modes (zero source lines — the vendor drop already contains the whole release line: EAS/google-services wiring, desktop iframe fix, bearer/CSRF tightening, desktop UI); `c172f2c`'s tree adds no file `b4c0f15` lacks (it only lacks `prisma/db/.gitkeep`). Therefore every conflict resolves to the M3 side: tree reset to `b4c0f15` exactly as a FORWARD commit on top of the user's own `c172f2c` — no force-push, no history rewrite, no remote commits deleted. This also restored the honest 14-stage `ci.yml` (+84 lines) and the conflicted `bun.lock` → the verified M3 lockfile.
+- **Files changed**: 929 files (−1846 conflict-junk lines, +84 CI-gate/.gitkeep lines; the rest mode-only).
+- **Verification on the resolved tree**: `bun install --frozen-lockfile` 579 packages; `tsc --noEmit` 0; eslint 0 errors (9 advisory warnings); `bun test tests/unit` **1728/1728 in two consecutive runs**; mobile `npm ci` + `tsc` 0.
+- **Limitations**: push to GitHub blocked (no credential — TD-24); the M3 line's 22-commit history is preserved locally as `m3-history` and in the bundle, NOT pushed.
+
+### Entry 18 · Test isolation · de-flake phase3-wsd-mobile (pwgrant throttle bucket) **[commit `ae90869`]**
+- **Root cause**: `phase-r5-security-isolation`'s deliberate per-IP-throttle exhaustion test left the DB-backed `pwgrant:ip:*` bucket (Throttle table, 10/5 min) full after cleaning only its login-audit rows. bun runs all unit files in one process against one database, so phase3-wsd-mobile's bad-credential grant inherited the full bucket → 429 instead of 401. Deterministic in any full suite not crossing a 5-minute window boundary (the M3 runs got lucky); passes in isolation.
+- **Fix**: the test's cleanup now also deletes the `pwgrant:ip:*` namespace — hermetic-suite class, same as `a5fc1af`. No assertion weakened.
+- **Tests**: full suite 1728/1728 twice after the fix.
+
+### Entry 19 · T-14 · Native first-login MFA enrollment wizard **[commit `cc280f0`]**
+- **Files changed**: `mobile/src/lib/auth.ts` (+98 — `enrollToken` state, `startMfaEnrollment`, `completeMfaEnrollment`, honest `login()` result), `mobile/app/(auth)/mfa-enroll.tsx` (new, 3-step wizard), `mobile/app/(auth)/login.tsx` (hand-off), `tests/unit/mobile-contract.test.ts` (pins).
+- **Functionality**: unenrolled users on MFA-required roles complete enrollment natively: server-issued QR (220px PNG data-URL) + selectable manual-entry secret → first TOTP code → recovery codes shown EXACTLY once with explicit save confirmation. The 15-minute PREAUTH enrollToken carries no API rights (C-1). Errors surfaced verbatim (expired window → back to sign-in; rate limit; wrong code). No success before `auth.mfa.enroll.enable` returns.
+- **DB changes**: none (server contract pre-existing — H-1 suite, 10 behavioral tests, untouched).
+- **Tests**: contract pins (both actions registered + public + app-referenced) — green; mobile tsc 0.
+- **Limitations**: NOT device-verified (TD-26); no biometric/liveness claims anywhere.
+
+### Entry 20 · T-15 · Push registration honesty + EAS projectId resolution **[commit `4234159`]**
+- **Premise correction**: app.json already carried `expo.extra.eas.projectId` `5df89cc1-1316-49e8-ae1d-4ced3b9a69b5` (release line's `eas init`, EAS build `30e4a348` completed against it). The M-line audit missed the nested key. The plan's task text is annotated accordingly.
+- **Files changed**: `mobile/src/lib/push.ts` (full guard, fail-closed, explicit resolution), `tests/unit/mobile-contract.test.ts` (config pin).
+- **Functionality**: registration can no longer throw past its caller or break startup; unconfigured projectId → no token minted (no dead `DeviceToken` rows); server-registration failure → null + honest log + nothing stored (was: minted token returned as success). `EXPO_PUBLIC_EAS_PROJECT_ID` overrides the manifest for build-time repointing. Unregister payload already correct from the first cycle.
+- **DB changes**: none. **Tests**: contract pin green; mobile tsc 0.
+- **Limitations**: real-device push receive + logout-unregister NOT verified (TD-26).
+
+### Entry 21 · T-16 · Web export honesty audit + failure tests **[commit `7ffda93`]**
+- **Audit result (server handler + client toast timing, every web export path)**:
+  | Path | Verdict |
+  |---|---|
+  | `payroll.export.salary` (csv/xlsx/pdf) | honest — 404 no-match, 400 cancelled run, 403 BANK w/o `bankInfo.view`; real bytes, truthful totals, audited; client toasts AFTER the blob click with response totals |
+  | `backups.export` | honest — 3 gates (typed confirm, password re-auth, pre-audit), job queue → poll → download → toast with real table/row counts |
+  | `attendance.events.export` | honest — rowCount + truncated cap flag; client toasts real counts, truncation is an error toast |
+  | `employees.exportCsv`, `reports.audit.export` | honest — capped, count + truncated flags; toasts after click with real counts |
+  | `reports.attendanceOverviewCsv`, `reports.holidayCalendarIcs`, shared `DataTable` CSV | honest — real generated text; toast (if any) after delivery |
+  | `employees.docs.download`, `letters.download` | honest — 404s, entitlement/self-scope gates, strict decrypt fails loudly |
+  | `pf.template.download` (client) | **WAS broken** — silent no-op when the response carried no base64; now errors loudly (`payroll.tsx`) |
+- **Files changed**: `src/hrm/views/payroll.tsx`, `tests/unit/t16-export-honesty.test.ts` (new, 12 cases).
+- **DB changes**: none.
+- **Tests**: 12/12 green — unknown-run 404; cancelled-run 400; no-match 404; BANK-without-perm 403 (custom-role fixture); csv/xlsx/pdf real bytes (ZIP `%PDF` magic) + true totals; designated-but-accountless BANK employee → visible skip list; audit row with real totals; events rowCount == delivered lines; PF template always a decodable workbook (zero-employee tenant included).
+- **Limitations**: toast timing is code-audited, not browser-E2E-tested (no Playwright lane for the SPA).
+
+### Entry 22 · M4 documentation + CI env hardening **[commits `817503e` + this one]**
+- **CI env fix (`817503e`)**: running the full gate under the workflow's OWN exported env (both URLs at hrm_test) exposed a latent first-run failure — the unit preload's dev-database protection refuses the TEST_DATABASE_URL candidate and falls through to the `?schema=hrm_unit_test` topology, under which the trigram DDL test fails (42704, pg_trgm dropped with the reset public schema). Fix: workflow `DATABASE_URL` points at the maintenance `postgres` database; the migrate-deploy step gets an explicit hrm_test step env. Proof: the full 14-stage gate passes under the exact fixed env locally.
+- Master plan (phase map, T-14/15/16 entries with delivered scope + corrected T-15 premise, M4 completion record, M5 recommendation), module status (auth row now Functional w/ wizard; push shell note; NOT-claimed list refreshed), debt register (stale TD-4/TD-5 annotated RESOLVED per M2 evidence; TD-24 re-scoped to the precise credential blocker; new TD-26 device verification, TD-27 headless background sync, TD-28 the broken-main incident), readiness checklist (§1 counts, §4 M4 scope, §6 exact blocker + setup steps, §7 refreshed risks), API contract audit (§8 M4 addendum).
+
+---
+
 ## 2026-10-30 — Third implementation cycle (M3: offline outbox + selfie attendance)
 
 ### Entry 12 — T-12 (server half) · Idempotent replay + offline-capture classification **[commit `dcbea29`, verified this session]**

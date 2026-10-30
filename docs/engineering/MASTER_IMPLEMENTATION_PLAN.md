@@ -14,7 +14,7 @@
 | 0 — Stabilization & engineering audit | T-01…T-09 | **COMPLETE & COMMITTED** (first cycle, 2026-10-30 — one commit per task on baseline `e7e34eb`; see `IMPLEMENTATION_CHANGELOG.md`) |
 | 1 — Backend & core hardening | T-10…T-12, T-18…T-20 | **T-10 + T-11 + T-12 COMPLETE** (M2 + M3, 2026-10-30 — suite 1683→1728 green, lint 0 errors, offline outbox server contract shipped; commits `d3c90aa`, `eefefa4`, `308ee38`, `dcbea29`); T-18…T-20 open |
 | 2 — Shared UI/UX foundation | T-21 | planned (web SPA already largely conforms; mobile theme exists) |
-| 3 — Mobile: make core modules work | T-04…T-06, T-13…T-16 | Priority A delivered (first cycle); **T-13 selfie capture delivered (M3)**; offline outbox T-12 delivered (M3); T-14…T-16 follow |
+| 3 — Mobile: make core modules work | T-04…T-06, T-13…T-16 | Priority A delivered (first cycle); **T-13 selfie capture delivered (M3)**; offline outbox T-12 delivered (M3); **T-14…T-16 delivered (M4)** |
 | 4 — Desktop managed shell | T-09, T-22 | planned |
 | 5 — HRM business module completion | T-23, T-24 | planned |
 | 6 — SaaS administration & commercial readiness | T-25 | planned (SaaS layer already substantial — see health report §5) |
@@ -163,29 +163,31 @@
 - **Testing**: `tests/unit/m3-offline-outbox-server.test.ts` (selfie replay), `tests/unit/mobile-contract.test.ts` (schema pins), `tests/unit/selfie-checkin.test.ts` (pre-existing 7 policy tests).
 - **Complexity**: M.
 
-**T-14 · Native MFA enrollment wizard (mobile)**
+**T-14 · Native MFA enrollment wizard (mobile)** ✅ delivered (M4, 2026-10-30)
 - **Problem**: `mfaEnrollmentRequired` blocks mobile login with an honest redirect message (T-02 interim).
 - **Solution**: implement `auth.mfa.enroll.start`/`.enable` flows with TOTP secret display + first-code verification.
+- **Delivered scope**: 3-step native wizard (`app/(auth)/mfa-enroll.tsx`): server-issued QR (220px PNG data-URL) + selectable manual-entry secret → first-code verification → recovery codes shown EXACTLY once with explicit save confirmation. Auth store keeps the 15-minute PREAUTH `enrollToken` (no API rights, C-1); login hands off to the wizard. Server side was already complete (H-1 suite, 10 behavioral tests); the behavioral contract is unchanged. Expired-window / rate-limit / wrong-code errors surfaced verbatim; no success before `auth.mfa.enroll.enable` returns. NOT device-verified (TD-26).
 - **Dependencies**: T-02 (delivered).
-- **Files**: `mobile/app/(auth)/mfa-enroll.tsx` (new), `mobile/src/lib/auth.ts`.
-- **Acceptance**: an unenrolled admin can complete enrollment on mobile.
-- **Testing**: contract test for the two actions + device test.
+- **Files**: `mobile/app/(auth)/mfa-enroll.tsx` (new), `mobile/src/lib/auth.ts`, `mobile/app/(auth)/login.tsx`, `tests/unit/mobile-contract.test.ts` (pins).
+- **Acceptance**: an unenrolled admin can complete enrollment on mobile — **code-complete; simulator/device test outstanding** (contract pins + h1 server suite green).
+- **Testing**: contract test for the two actions (registered + public + referenced by the app) + device test (owed, TD-26).
 - **Complexity**: M.
 
-**T-15 · Mobile push notifications end-to-end**
+**T-15 · Mobile push notifications end-to-end** ✅ delivered (M4, 2026-10-30 — with a corrected premise)
 - **Problem**: `push.registerDevice` is called at startup, but the Expo project lacks a configured push projectId; `expo-notifications` 0.29 on SDK 52 requires it for remote pushes.
-- **Solution**: configure EAS projectId, guard registration failures, verify `push.unregisterDevice` payload, test a real push.
-- **Files**: `mobile/app.json`, `mobile/src/lib/push.ts`.
-- **Acceptance**: a real device receives a tenant push; logout unregisters.
-- **Testing**: device test.
+- **Premise correction (M4)**: app.json HAS carried `expo.extra.eas.projectId` = `5df89cc1-1316-49e8-ae1d-4ced3b9a69b5` since the release line linked `@finixhr/finix-hr` (EAS build `30e4a348` completed against it — `docs/RELEASE-STATUS.md` §4.4). The M-line audit read the manifest's top level and missed the nested key. What was ACTUALLY missing: registration failure honesty.
+- **Delivered scope**: `registerForPushNotifications` fully guarded (a projectId/permission/network failure can no longer escape to the caller or break startup); explicit projectId resolution (manifest `extra.eas.projectId`, overridable via `EXPO_PUBLIC_EAS_PROJECT_ID`); fail-closed when unconfigured (no token minted, no dead `DeviceToken` rows); a SERVER-registration failure now returns null and stores nothing (was: returned the minted token as if registration had succeeded). `push.unregisterDevice` payload was already correct (token REQUIRED, persisted at registration, sent at logout — first-cycle fix + contract pins). Real-device push receive + logout-unregister remain UNVERIFIED (TD-26).
+- **Files**: `mobile/src/lib/push.ts`, `tests/unit/mobile-contract.test.ts` (config + resolution pins).
+- **Acceptance**: a real device receives a tenant push; logout unregisters — **code-complete; device test outstanding** (TD-26).
+- **Testing**: contract pin (app.json keeps a non-placeholder projectId; push.ts keeps resolving it) + device test (owed, TD-26).
 - **Complexity**: M.
 
-**T-16 · Web reports export honesty check**
+**T-16 · Web reports export honesty check** ✅ delivered (M4, 2026-10-30)
 - **Problem**: directive: never show export success unless the file was actually generated/delivered.
-- **Solution**: audit every web export path (`salary-export.ts`, `reports.*Csv`, `backups.export`) for premature success toasts; add failure paths + tests.
-- **Files**: `src/hrm-server/salary-export.ts`, export handlers, web UI toasts.
-- **Acceptance**: no success toast without delivered bytes; failure tests exist.
-- **Testing**: unit tests + manual.
+- **Delivered scope**: full audit of every web export path (server handler + client toast timing — table in `IMPLEMENTATION_CHANGELOG.md` Entry 21). The core surface was already honest (salary export 404s on no-match/cancelled runs and delivers real bytes with truthful totals; backups.export polls a job and toasts real counts after download; events/employees/audit CSVs report real row counts and truncation). ONE real gap fixed: the PF opening-balance template download silently no-oped when the response carried no base64 — payroll.tsx now errors loudly. New `tests/unit/t16-export-honesty.test.ts` (12 cases) pins the failure/delivery contract of `payroll.export.salary` (404/400/403 paths, PK/PDF magic bytes, truthful totals, audit row), `attendance.events.export` (rowCount == delivered lines) and `pf.template.download` (always a decodable workbook).
+- **Files**: `src/hrm/views/payroll.tsx`, `tests/unit/t16-export-honesty.test.ts` (new).
+- **Acceptance**: no success toast without delivered bytes; failure tests exist — **met** (12/12 green; toast timing audited client-side).
+- **Testing**: unit tests + manual (client toast audit documented).
 - **Complexity**: M.
 
 **T-18 · `ess.leave` payload bound + ESS list caps audit**
@@ -285,6 +287,34 @@ vendor baseline). The full 14-stage local gate (`scripts/ci.sh`, `E2E_SKIP=1`) e
 suite is 1728/1728. Hosted CI (M3-E) could NOT be run: this environment has no GitHub remote and no
 credentials (exact blocker recorded in `PRODUCTION_READINESS_CHECKLIST.md` §6) — the workflow file
 and the gate it runs are verified locally and ready.
-Recommended next milestone: **M4 = T-14…T-16** (native MFA enrollment wizard, notification
-mark-read, offline polish) interleaved with T-18/T-19/T-20 (ess.leave bound, ESS isolation tests,
-prefixed aliases), then T-21/T-22 (UI conformance sweep, desktop shell hardening).
+
+**M4 is complete** (same day, fourth session — GitHub integration + T-14…T-16):
+- **Baseline verified first**: the sandbox recycle had destroyed `.git/objects`; recovered from the
+  M3 bundle (`finix-hr-main-20261030-session3.bundle`, verified `b4c0f15`) and re-fetched
+  `origin/main`. Found GitHub `main` at `c172f2c` ("New Update") = a BOTCHED MERGE of the M3 tree
+  into the release line — **71 tracked files carried `<<<<<<< ======= >>>>>>>` markers and main
+  did not even compile** (`next-env.d.ts`, `bun.lock`, every mobile screen, owner-console pages,
+  server routes), while CI's `|| true` typecheck hid it. Proven safe resolution: release tip
+  `591a82e` and the M3 vendor-drop root `e7e34eb` differ only in lockfiles + file modes (zero
+  source lines — the vendor drop already contains the whole release line), and `c172f2c`'s tree
+  adds nothing `b4c0f15` lacks. Tree reset to the verified M3 state as a forward commit on top of
+  the user's own `c172f2c` (no force-push, no history rewrite, no remote commits deleted). Local
+  `main` = `origin/main` + M4 commits, ready to fast-forward-push the moment credentials exist.
+- **T-14 / T-15 / T-16 delivered** (entries above; details in `IMPLEMENTATION_CHANGELOG.md`
+  Entries 17–22).
+- Suite now **1742/1742** (+14 tests: 12 export-honesty, 2 contract pins) in two consecutive runs;
+  tsc 0; eslint 0 errors (9 pre-existing advisory warnings); mobile tsc 0.
+- One cross-file test-isolation defect fixed on the way (the r5 pwgrant-throttle exhaustion test
+  left the DB-backed bucket full — phase3-wsd-mobile inherited a 429; deterministic, now hermetic).
+- **Hosted CI still blocked, precisely**: `origin` (https://github.com/finixhr/hrms.git) is
+  configured and fetchable read-only, but this sandbox has NO push credential (no `gh`, no
+  credential helper, no token env) and the unauthenticated REST API is rate-limited from this
+  network — so no workflow can be triggered and no run can be inspected from here. The honest
+  14-stage workflow is committed and ready; see `PRODUCTION_READINESS_CHECKLIST.md` §6 for the
+  exact setup steps.
+
+Recommended next milestone: **M5 = T-18/T-19/T-20** (ess.leave bound, ESS isolation negative
+tests, prefixed aliases) **+ the first hosted-CI run** (needs only a push credential — the
+integration work is already committed) **+ a device-verification pass** (TD-26: T-14 wizard,
+T-15 push, M3 selfie/NetInfo on physical Android + iOS). Then T-21/T-22 (UI conformance sweep,
+desktop shell hardening).
