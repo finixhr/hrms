@@ -1,18 +1,20 @@
 // Beautiful login screen with gradient header and polished form
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
   ScrollView, TouchableOpacity, Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useAuthStore } from "@/src/lib/auth";
 import { Input, Button } from "@/src/components/ui";
 import { Colors, Spacing, Typography, Shadow } from "@/src/theme";
 
 export default function LoginScreen() {
-  const { login, verifyMfa, mfaPending, isLoading, error, clearError } = useAuthStore();
+  const router = useRouter();
+  const { login, verifyMfa, mfaPending, mfaEnrollmentRequired, isLoading, error, clearError } = useAuthStore();
   const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw]   = useState(false);
@@ -29,6 +31,13 @@ export default function LoginScreen() {
     if (mfaCode.length < 6) { Alert.alert("Required", "Enter the 6-digit code."); return; }
     try { await verifyMfa(mfaCode.trim()); } catch { /* shown via error state */ }
   }
+
+  // T-14 — a first-login forced enrollment hands off to the native wizard.
+  // The store keeps the 15-minute enrollToken; the wizard drives
+  // auth.mfa.enroll.start / .enable from there.
+  useEffect(() => {
+    if (mfaEnrollmentRequired) router.replace("/(auth)/mfa-enroll");
+  }, [mfaEnrollmentRequired, router]);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>

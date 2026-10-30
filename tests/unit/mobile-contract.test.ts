@@ -118,6 +118,8 @@ for (const a of OUTBOX_ACTIONS) mobileActions.add(a)
 const MOBILE_CRITICAL_ACTIONS = [
   // auth rail
   "auth.login", "auth.mfa.verify", "auth.me",
+  // auth rail — first-login MFA enrollment wizard (T-14)
+  "auth.mfa.enroll.start", "auth.mfa.enroll.enable",
   // home + notifications
   "ess.dashboard", "notifications.list",
   // attendance (today/week + policy + geo check-in/out + fallback)
@@ -220,6 +222,22 @@ describe("T-17 · employee-plane actions stay callable by the default employee r
   test("auth.login / auth.mfa.verify remain public credential-exchange actions", () => {
     expect(routes["auth.login"]!.public).toBe(true)
     expect(routes["auth.mfa.verify"]!.public).toBe(true)
+  })
+
+  test("T-14 · first-login MFA enrollment actions are public, capability-gated exchanges", () => {
+    // These are INTENTIONALLY_PUBLIC (M-02): the enrollToken capability
+    // (proof of password) IS the authentication — exactly like auth.mfa.verify.
+    // The behavioral contract (start provisions a secret; enable refuses a
+    // wrong code, refuses already-enrolled accounts, promotes to a full
+    // session, returns recovery codes exactly once) is pinned in
+    // tests/unit/h1-mfa-enrollment.test.ts against the real /api/hrm boundary.
+    expect(routes["auth.mfa.enroll.start"]!.public).toBe(true)
+    expect(routes["auth.mfa.enroll.enable"]!.public).toBe(true)
+    // The wizard must actually reference both actions (scanner-checked), and
+    // the login hand-off must exist — the app cannot regress to the T-02
+    // "go to the web portal" dead end without failing the critical-action pin.
+    expect(mobileActions.has("auth.mfa.enroll.start")).toBe(true)
+    expect(mobileActions.has("auth.mfa.enroll.enable")).toBe(true)
   })
 })
 
@@ -329,6 +347,25 @@ describe("T-17 · payload field names the mobile app depends on", () => {
     expect(schema.shape.platform.safeParse("expo").success).toBe(true)
     expect(schema.shape.platform.safeParse("android").success).toBe(false)
     expect(schema.shape.platform.safeParse("ios").success).toBe(false)
+  })
+
+  test("T-15 · the EAS push projectId is configured in app.json (non-placeholder)", () => {
+    // Remote Expo push tokens are minted AGAINST the EAS project — without
+    // extra.eas.projectId, getExpoPushTokenAsync cannot produce a working
+    // remote token and every registered device would be dead weight in
+    // DeviceToken. The release line linked @finixhr/finix-hr (EAS build
+    // 30e4a348 completed against it — docs/RELEASE-STATUS.md §4.4); this pin
+    // keeps the manifest wired so a refactor cannot silently drop it.
+    const manifest = JSON.parse(readFileSync(join(REPO_ROOT, "mobile/app.json"), "utf8"))
+    const projectId = manifest?.expo?.extra?.eas?.projectId
+    expect(typeof projectId).toBe("string")
+    expect(projectId!.length).toBeGreaterThanOrEqual(30) // UUID shape
+    expect(projectId).not.toMatch(/YOUR_|PLACEHOLDER|CHANGEME/i)
+    // push.ts must resolve that same manifest path (and fail closed without it)
+    const pushSrc = readFileSync(join(REPO_ROOT, "mobile/src/lib/push.ts"), "utf8")
+    expect(pushSrc).toContain("expoConfig?.extra")   // manifest path resolution
+    expect(pushSrc).toContain("eas?.projectId")      // the nested EAS key
+    expect(pushSrc).toContain("EXPO_PUBLIC_EAS_PROJECT_ID")
   })
 })
 
