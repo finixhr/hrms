@@ -29,7 +29,15 @@ on:
 env:
   # Provide safe dummy keys so the server doesn't refuse to boot in test mode
   HRM_MFA_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
-  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/hrm_test"
+  # M4 (2026-10-30): DATABASE_URL deliberately points at the maintenance
+  # database, NOT hrm_test. The unit-suite preload (tests/preload.ts) refuses
+  # any TEST_DATABASE_URL candidate that lands on the same server+database
+  # as DATABASE_URL (dev-database force-reset protection) and would then fall
+  # through to the ?schema=hrm_unit_test topology — under which the trigram
+  # DDL test fails (pg_trgm extension dropped with the reset public schema;
+  # EMP-12/EMP-13). Discovered by running the full gate under this exact env
+  # locally; this layout reproduces the verified plain-database topology.
+  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
   TEST_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/hrm_test"
   NODE_ENV: "test"
   NEXT_TELEMETRY_DISABLED: "1"
@@ -78,12 +86,14 @@ jobs:
 
       - name: Deploy migrations to the test database
         run: bunx prisma migrate deploy
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/hrm_test"
 
       # ---- Hard gates: each step fails the job on its own ----------------
       - name: TypeScript type-check
         run: bunx tsc --noEmit
 
-      - name: ESLint (fails until T-11 clears the pre-existing 87 errors)
+      - name: ESLint (hard gate — 0 errors since T-11; 9 advisory warnings tracked as TD-22)
         run: bun run lint
 
       - name: Secret scan (blocks on findings)
