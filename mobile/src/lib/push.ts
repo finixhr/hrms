@@ -27,56 +27,89 @@ Notifications.setNotificationHandler({
 // Register device for push notifications
 // ---------------------------------------------------------------------------
 
+/** Resolve the EAS project the push token is minted for.
+ *  `eas init` writes it to app.json → extra.eas.projectId; an
+ *  EXPO_PUBLIC_EAS_PROJECT_ID env var can repoint a build without editing
+ *  the manifest. Without a projectId expo-notifications cannot mint a
+ *  REMOTE push token — fail closed instead of registering a dead token. */
+function resolveProjectId(): string | null {
+  const fromEnv = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+  if (fromEnv && fromEnv.length > 10) return fromEnv;
+  const fromManifest = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
+  if (fromManifest && fromManifest !== "YOUR_EAS_PROJECT_ID") return fromManifest;
+  return null;
+}
+
 export async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) {
-    console.warn("[push] Push notifications require a physical device");
-    return null;
-  }
-
-  // Request permission
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== "granted") {
-    console.warn("[push] Push notification permission denied");
-    return null;
-  }
-
-  // Android requires a notification channel
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "Finix HR",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#1e40af",
-    });
-  }
-
-  // Get Expo push token
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  const tokenOpts = projectId && projectId !== "YOUR_EAS_PROJECT_ID" ? { projectId } : undefined;
-  const tokenData = await Notifications.getExpoPushTokenAsync(tokenOpts);
-  const expoPushToken = tokenData.data;
-
-  // Register with server
-  // CONTRACT (routes/push.ts): platform is enum ["expo" | "fcm" | "apns"] —
-  // an Expo push token registers as "expo" (the schema default). The old
-  // code sent Platform.OS ("android"/"ios"), which failed enum validation,
-  // so every registration was silently rejected.
+  // The whole flow is guarded: a push-registration failure must never break
+  // app startup (T-15) — and it must never masquerade as success.
   try {
-    await rpc("push.registerDevice", { token: expoPushToken });
+    if (!Device.isDevice) {
+      console.warn("[push] Push notifications require a physical device");
+      return null;
+    }
+
+    const projectId = resolveProjectId();
+    if (!projectId) {
+      console.warn(
+        "[push] No EAS projectId configured (app.json extra.eas.projectId or " +
+        "EXPO_PUBLIC_EAS_PROJECT_ID) — remote push tokens cannot be minted; skipping registration",
+      );
+      return null;
+    }
+
+    // Request permission
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== "granted") {
+      console.warn("[push] Push notification permission denied");
+      return null;
+    }
+
+    // Android requires a notification channel
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "Finix HR",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#1e40af",
+      });
+    }
+
+    // Get Expo push token — minted against the configured EAS project
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    const expoPushToken = tokenData.data;
+
+    // Register with server
+    // CONTRACT (routes/push.ts): platform is enum ["expo" | "fcm" | "apns"] —
+    // an Expo push token registers as "expo" (the schema default). The old
+    // code sent Platform.OS ("android"/"ios"), which failed enum validation,
+    // so every registration was silently rejected.
+    //
+    // Honesty (T-15): a minted token the SERVER never accepted receives
+    // nothing — report failure (null), store nothing, and let the next
+    // app start retry. Never return the token as if registration succeeded.
+    try {
+      await rpc("push.registerDevice", { token: expoPushToken });
+    } catch (err) {
+      console.error("[push] Failed to register device token with the server:", err);
+      return null;
+    }
     await SecureStore.setItemAsync(PUSH_TOKEN_KEY, expoPushToken);
     console.log("[push] Registered device token:", expoPushToken);
+    return expoPushToken;
   } catch (err) {
-    console.error("[push] Failed to register device token:", err);
+    // getExpoPushTokenAsync / permission / channel failures land here:
+    // logged honestly, never fatal, no false success.
+    console.warn("[push] Push notification registration failed:", err);
+    return null;
   }
-
-  return expoPushToken;
 }
 
 // ---------------------------------------------------------------------------
