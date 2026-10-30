@@ -2025,19 +2025,23 @@ function PfBulkImportDialog({ onClose, onDone }: { onClose: () => void; onDone: 
     setDownloading(true)
     try {
       const res = await rpc<any>("pf.template.download", { filter: templateScope })
-      if (res?.base64) {
-        const bin = atob(res.base64)
-        const bytes = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-        const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = res.fileName || "PF_Opening_Balances.xlsx"
-        a.click()
-        URL.revokeObjectURL(url)
-        toast("Template downloaded with PF employees")
+      // T-16 honesty: a response without real file bytes is a failure —
+      // say so instead of spinning the button down in silence.
+      if (!res?.base64) {
+        toast("Template download failed — the server returned no file. Try again or contact support.", "err")
+        return
       }
+      const bin = atob(res.base64)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = res.fileName || "PF_Opening_Balances.xlsx"
+      a.click()
+      URL.revokeObjectURL(url)
+      toast("Template downloaded with PF employees")
     } catch (e: any) {
       toast(String(e?.message || e), "err")
     } finally {
