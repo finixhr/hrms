@@ -542,7 +542,11 @@ route("jobs.list", {
     }
     const take = Math.min(Number(p?.limit) || 50, 200)
     const jobs = await db.bgJob.findMany({
+<<<<<<< HEAD
+      where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], take, skip: Number(p?.offset) || 0,
+=======
       where, orderBy: { createdAt: "desc" }, take, skip: Number(p?.offset) || 0,
+>>>>>>> origin/main
       select: {
         id: true, type: true, status: true, progress: true, total: true, error: true,
         priority: true, attempts: true, maxAttempts: true, scheduledFor: true,

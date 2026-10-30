@@ -26,7 +26,10 @@
 // completion SERVER-SIDE (provider validation API) and settles; /api/payments
 // /ipn does the same for webhooks, idempotently (unique provider+txn index).
 import { z } from "zod"
+<<<<<<< HEAD
+=======
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
+>>>>>>> origin/main
 import { db } from "@/lib/db"
 import { route } from "./registry"
 import { Deny } from "../rbac"

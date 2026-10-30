@@ -17,8 +17,13 @@
 //   4. owner.billing.collections — the dunning workbench: only overdue
 //      PENDING invoices (future-due and PAID never leak), worst-first with
 //      exact day counts, the per-invoice reminder state riding the response,
+<<<<<<< HEAD
+//      and the manual send (owner.dunning.remind) bumping the counter ONLY
+//      when a reminder is actually delivered (S1-012).
+=======
 //      and the manual send (owner.dunning.remind) incrementing the counter the
 //      workbench reads.
+>>>>>>> origin/main
 import "./_testdb"
 import { describe, test, expect, beforeAll, afterAll } from "bun:test"
 import { db } from "@/lib/db"
@@ -395,6 +400,26 @@ describe("P2 — owner.billing.collections (dunning workbench + reminder state)"
     expect(r.rows.find((x: any) => x.id === col2.id).remindersSent).toBe(0)
   })
 
+<<<<<<< HEAD
+  test("a manual send (owner.dunning.remind) bumps the counter only when delivered (S1-012)", async () => {
+    const def = ownerRoutes["owner.dunning.remind"]
+    const res = await (def.handler as any)(manageCtx, { invoiceId: col1.id })
+    expect(["SENT", "SKIPPED", "FAILED"]).toContain(res.status)
+    // T-10 (2026-10-30): S1-012 changed the dunning contract — the cadence
+    // counter bumps ONLY on a delivered (SENT) reminder; FAILED/SKIPPED sends
+    // must not push the next reminder 7 days out, because the tenant received
+    // nothing. The test env has no platform email gateway configured → the
+    // send is deterministically SKIPPED → the counter must stay at the seeded 2.
+    if (res.status === "SENT") {
+      expect(res.remindersSent).toBe(3) // 2 seeded + this delivered send
+    } else {
+      expect(res.remindersSent).toBe(0) // nothing delivered — no bump (S1-012)
+    }
+    const r = await call("owner.billing.collections", { page: 1, pageSize: 10, search: vendorName })
+    const row = r.rows.find((x: any) => x.id === col1.id)
+    expect(row.remindersSent).toBe(res.status === "SENT" ? 3 : 2) // workbench sees the S1-012 truth
+    expect(row.lastReminderAt).toBeTruthy() // the seeded timestamp survives a skipped send
+=======
   test("a manual send (owner.dunning.remind) increments the counter the workbench reads", async () => {
     const def = ownerRoutes["owner.dunning.remind"]
     const res = await (def.handler as any)(manageCtx, { invoiceId: col1.id })
@@ -405,5 +430,6 @@ describe("P2 — owner.billing.collections (dunning workbench + reminder state)"
     const row = r.rows.find((x: any) => x.id === col1.id)
     expect(row.remindersSent).toBe(3)
     expect(row.lastReminderAt).toBeTruthy()
+>>>>>>> origin/main
   })
 })

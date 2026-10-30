@@ -436,6 +436,12 @@ export function CreateEmployeeDialog({ open, onOpenChange, lookups, onCreated }:
   )
 
   // Build fresh initial values
+<<<<<<< HEAD
+  // T-11 — optional-chained deps (`lookups?.branches`) defeat the compiler's
+  // memoization preservation; the value is lifted to a plain local first.
+  const lookupBranches = lookups?.branches
+=======
+>>>>>>> origin/main
   const buildInitialValues = useCallback(() => {
     return {
       photoUrl: "",
@@ -510,16 +516,31 @@ export function CreateEmployeeDialog({ open, onOpenChange, lookups, onCreated }:
       payoutMfsProvider: "BKASH",
       payoutMfsNumber: "",
     }
+<<<<<<< HEAD
+  }, [prefillParams, probationDefault, lookupBranches])
+
+  const [formValues, setFormValues] = useState<Record<string, any>>(buildInitialValues)
+  // T-11 — the initial-values snapshot is STATE (read during render by the
+  // isDirty memo), not a ref: ref reads during render are exactly what the
+  // react-hooks/refs rule forbids. Writers are the open-effect below and the
+  // submit handler — both legal mutation points.
+  const [initialSnapshot, setInitialSnapshot] = useState(() => JSON.stringify(buildInitialValues()))
+=======
   }, [prefillParams, probationDefault, lookups?.branches])
 
   const [formValues, setFormValues] = useState<Record<string, any>>(buildInitialValues)
   const initialRef = useRef<string>(JSON.stringify(buildInitialValues()))
+>>>>>>> origin/main
 
   useEffect(() => {
     if (open) {
       const fresh = buildInitialValues()
       setFormValues(fresh)
+<<<<<<< HEAD
+      setInitialSnapshot(JSON.stringify(fresh))
+=======
       initialRef.current = JSON.stringify(fresh)
+>>>>>>> origin/main
       setAttemptedSubmit(false)
       setServerError(null)
       setActiveSection("basic")
@@ -528,8 +549,13 @@ export function CreateEmployeeDialog({ open, onOpenChange, lookups, onCreated }:
 
   // Track dirty status
   const isDirty = useMemo(() => {
+<<<<<<< HEAD
+    return JSON.stringify(formValues) !== initialSnapshot
+  }, [formValues, initialSnapshot])
+=======
     return JSON.stringify(formValues) !== initialRef.current
   }, [formValues])
+>>>>>>> origin/main
 
   // Validation output computed in real time
   const validation = useMemo(() => {
@@ -819,7 +845,11 @@ export function CreateEmployeeDialog({ open, onOpenChange, lookups, onCreated }:
         toast(`Employee ${formValues.fullName} created successfully`, "ok")
       }
 
+<<<<<<< HEAD
+      setInitialSnapshot(JSON.stringify(formValues))
+=======
       initialRef.current = JSON.stringify(formValues)
+>>>>>>> origin/main
       onOpenChange(false)
       onCreated(emp.id)
     } catch (err: any) {

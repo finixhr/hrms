@@ -51,7 +51,11 @@ route("reviews.list", {
     const page = Math.max(1, Number(p?.page) || 1)
     const [list, total] = paged
       ? await Promise.all([
+<<<<<<< HEAD
+          db.performanceReview.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
+=======
           db.performanceReview.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+>>>>>>> origin/main
           db.performanceReview.count({ where }),
         ])
       : [await db.performanceReview.findMany({ where, orderBy: { createdAt: "desc" } }), null]
@@ -358,7 +362,11 @@ route("tasks.list", {
     const page = Math.max(1, Number(p?.page) || 1)
     const [list, total] = paged
       ? await Promise.all([
+<<<<<<< HEAD
+          db.task.findMany({ where, orderBy: [{ status: "asc" }, { dueDate: "asc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
+=======
           db.task.findMany({ where, orderBy: [{ status: "asc" }, { dueDate: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
+>>>>>>> origin/main
           db.task.count({ where }),
         ])
       : [await db.task.findMany({ where, orderBy: [{ status: "asc" }, { dueDate: "asc" }] }), null]

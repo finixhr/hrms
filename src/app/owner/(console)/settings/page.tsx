@@ -6,7 +6,11 @@
 // zod whitelist + audit); the Website Studio saves through owner.cms.*.
 import { useEffect, useState } from "react"
 import {
+<<<<<<< HEAD
+  AlertTriangle, CheckCircle2, Copy, Fingerprint, Globe, KeyRound, Loader2, Plus, Save, Send, ShieldCheck, ShieldOff, Trash2, Upload, X,
+=======
   AlertTriangle, CheckCircle2, Copy, Fingerprint, Globe, Image as ImageIcon, KeyRound, Loader2, PenTool, Plus, Save, Send, ShieldCheck, ShieldOff, Stamp, Trash2, Upload, X,
+>>>>>>> origin/main
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

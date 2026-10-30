@@ -37,7 +37,11 @@ route("loans.list", {
     const page = Math.max(1, Number(p?.page) || 1)
     const [loans, total, byStatus] = paged
       ? await Promise.all([
+<<<<<<< HEAD
+          db.loan.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
+=======
           db.loan.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+>>>>>>> origin/main
           db.loan.count({ where }),
           db.loan.groupBy({ by: ["status"], where: scopeWhere, _count: { _all: true }, _sum: { outstanding: true } }),
         ])
@@ -759,7 +763,11 @@ route("advances.list", {
     const page = Math.max(1, Number(p?.page) || 1)
     const [list, total, byStatus] = paged
       ? await Promise.all([
+<<<<<<< HEAD
+          db.advance.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
+=======
           db.advance.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+>>>>>>> origin/main
           db.advance.count({ where }),
           db.advance.groupBy({ by: ["status"], where: scopeWhere, _count: { _all: true }, _sum: { outstanding: true } }),
         ])
@@ -928,7 +936,11 @@ route("expenses.list", {
     } as const
     const [list, total, byStatus] = paged
       ? await Promise.all([
+<<<<<<< HEAD
+          db.expenseClaim.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize, select: listSelect }),
+=======
           db.expenseClaim.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize, select: listSelect }),
+>>>>>>> origin/main
           db.expenseClaim.count({ where }),
           db.expenseClaim.groupBy({ by: ["status"], where: scopeWhere, _count: { _all: true }, _sum: { amount: true } }),
         ])

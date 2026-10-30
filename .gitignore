@@ -20,7 +20,19 @@ backups/
 # generated TypeScript incremental-build state
 tsconfig.tsbuildinfo
 
+<<<<<<< HEAD
+# C-02 — prisma/db/'s CONTENTS are ignored so the SQLite source DB (custom.db)
+# can never enter history; the .gitkeep placeholder is the ONE tracked
+# exception so the docs-guard invariant (scripts/check-docs.sh §3) survives a
+# fresh checkout — it previously existed only as an untracked working-tree
+# file and vanished with the sandbox, failing the CI gate. (Directory-level
+# prisma/db/ would make the negation impossible: git cannot re-include a file
+# whose parent directory is excluded.)
+prisma/db/*
+!prisma/db/.gitkeep
+=======
 prisma/db/
+>>>>>>> origin/main
 .env.local
 desktop/src-tauri/target/
 mobile/dist/

@@ -389,7 +389,11 @@ route("attendance.register", {
     const paged = p?.page != null || p?.pageSize != null
     const pageSize = Math.min(500, Math.max(1, Number(p?.pageSize) || 200))
     const page = Math.max(1, Number(p?.page) || 1)
+<<<<<<< HEAD
+    const orderBy: any[] = [{ date: "asc" }, { employeeId: "asc" }, { id: "asc" }]
+=======
     const orderBy: any[] = [{ date: "asc" }, { employeeId: "asc" }]
+>>>>>>> origin/main
     const records = paged
       ? await db.attendance.findMany({ where, orderBy, skip: (page - 1) * pageSize, take: pageSize })
       : await db.attendance.findMany({ where, orderBy })
@@ -815,6 +819,112 @@ async function enforceMethodPolicy(vendorId: string, emp: any, p: any, hasSelfie
   return method
 }
 
+<<<<<<< HEAD
+// ================================================================
+// M3 (T-12) — mobile offline outbox support: idempotent replay +
+// offline-capture classification. The mobile app records approved
+// attendance operations in a persistent local outbox while offline and
+// syncs them later (same clientEventId on every attempt). These helpers
+// make the SERVER the trustworthy half of that contract:
+//   · findPunchReplay short-circuits a retried punch whose first attempt
+//     was already accepted — no second selfie proof, no second
+//     notification, no duplicate audit, no bogus "Already checked in
+//     today" for an event that actually landed.
+//   · offlineCaptureVerdict flags delayed offline captures for HR review
+//     while keeping the punch itself intact (attendance row + event +
+//     preserved clientTimestamp evidence for the reviewer).
+// ================================================================
+
+/** Look up an already-accepted punch event by its tenant-scoped idempotency
+ *  key (the "ci:"/"co:"/"si:" prefixed clientEventId the punch routes stamp
+ *  onto AttendanceEvent). Returns the prior event plus its linked
+ *  attendance row so a replay can answer with the recorded outcome. */
+async function findPunchReplay(vendorId: string, clientEventId: string | null | undefined, prefix: "ci:" | "co:" | "si:") {
+  if (!clientEventId) return null
+  const prior = await db.attendanceEvent.findFirst({
+    where: { vendorId, clientEventId: `${prefix}${clientEventId}` },
+  })
+  if (!prior) return null
+  const rec = prior.attendanceId
+    ? await db.attendance.findFirst({ where: { id: prior.attendanceId, vendorId } })
+    : null
+  const fence = prior.geoFenceId
+    ? await db.geoFence.findFirst({ where: { id: prior.geoFenceId, vendorId }, select: { name: true } })
+    : null
+  return { prior, rec, fenceName: fence?.name ?? null }
+}
+
+/** Shape a replay response: the recorded attendance row (when the event drove
+ *  one) plus the markers the mobile outbox needs — idempotentReplay tells the
+ *  queue "the original attempt WAS accepted, mark it synced", eventStatus/
+ *  reviewStatus tell the UI whether the punch itself needs HR review. */
+function punchReplayResponse(
+  replay: NonNullable<Awaited<ReturnType<typeof findPunchReplay>>>,
+) {
+  return {
+    ...(replay.rec ?? {}),
+    idempotentReplay: true as const,
+    eventStatus: replay.prior.status,
+    reviewStatus: replay.prior.reviewStatus,
+    recordedAt: replay.prior.occurredAt,
+    distance: replay.prior.distanceFromGeoFenceM,
+    fence: replay.fenceName,
+    integrity: null,
+  }
+}
+
+/** A punch captured on-device while offline is a REAL punch: the GPS fix and
+ *  clientTimestamp were taken at punch time and are replayed verbatim — never
+ *  fabricated. The attendance row's punch time remains the SERVER receipt
+ *  time (the existing authoritative-time business rule is unchanged). But a
+ *  materially delayed submission (>120s between device capture and server
+ *  receipt) is flagged OFFLINE_CAPTURE and queued for HR review with the
+ *  preserved clientTimestamp as evidence, so a reviewer — not a silent rule —
+ *  decides whether an on-time offline punch should keep its LATE status.
+ *  Near-real-time replays (≤120s) are accepted like any online punch. */
+const OFFLINE_REVIEW_DELAY_MS = 120_000
+
+function offlineCaptureVerdict(p: any): { review: boolean; delayMs: number | null; note: string } {
+  if (!p.offlineCapture) return { review: false, delayMs: null, note: "" }
+  const capturedAt = p.clientTimestamp ? Date.parse(p.clientTimestamp) : NaN
+  if (!Number.isFinite(capturedAt)) {
+    // offline capture without a device timestamp — cannot verify the delay;
+    // conservative: review
+    return { review: true, delayMs: null, note: "recorded offline (device timestamp missing)" }
+  }
+  const delayMs = Math.max(0, Date.now() - capturedAt)
+  if (delayMs > OFFLINE_REVIEW_DELAY_MS) {
+    const mins = Math.round(delayMs / 60_000)
+    const humanDelay = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`
+    return { review: true, delayMs, note: `recorded offline, submitted ${humanDelay} later (device clock: ${new Date(capturedAt).toISOString()})` }
+  }
+  return { review: false, delayMs, note: "recorded offline, submitted within 120s" }
+}
+
+/** Merge the offline-capture verdict into the event status/signals/reason the
+ *  punch routes report. Pure helper — same inputs, same outputs. */
+function applyOfflineCaptureToEvent(
+  baseStatus: string,
+  signals: string[],
+  reason: string,
+  verdict: ReturnType<typeof offlineCaptureVerdict>,
+) {
+  if (!verdict.review) {
+    return {
+      status: baseStatus,
+      signals,
+      reason: verdict.note ? `${reason} — ${verdict.note}` : reason,
+    }
+  }
+  return {
+    status: "REVIEW_REQUIRED",
+    signals: [...signals, "OFFLINE_CAPTURE"],
+    reason: `${reason} — ${verdict.note}`,
+  }
+}
+
+=======
+>>>>>>> origin/main
 /** Location-integrity analysis for a check-in/out (§24). Warn/review outcomes
  *  still let the attendance through (flagged for review); REJECT outcomes
  *  throw with a clear message (§87). */
@@ -882,6 +992,18 @@ route("attendance.geofence.checkin", {
     if (!Number.isFinite(Number(p.latitude)) || !Number.isFinite(Number(p.longitude))) throw new Deny("GPS coordinates required for geo-fence attendance", 400)
     const emp = await db.employee.findFirst({ where: { id: employeeId, vendorId: ctx.vendorId } })
     if (!emp) throw new Deny("Employee not found", 404)
+<<<<<<< HEAD
+    // M3 (T-12) — mobile offline outbox replay: a retry of an already-accepted
+    // event (same tenant + clientEventId) returns the recorded outcome WITHOUT
+    // re-running side effects (no second selfie proof, notification, audit or
+    // state churn). Checked after identity, before rate/quota/policy work so a
+    // replay can never be blocked by throttles the original attempt consumed.
+    if (p.clientEventId) {
+      const replay = await findPunchReplay(ctx.vendorId, p.clientEventId, "ci:")
+      if (replay) return punchReplayResponse(replay)
+    }
+=======
+>>>>>>> origin/main
     // SUB-107 (R3-5) — geo-fence punches ride the GEOFENCE plan feature. These
     // self-scoped routes carry no def.perm, so the dispatcher's module gate
     // never applies to them (the "attendance" prefix maps to no feature —
@@ -958,7 +1080,25 @@ route("attendance.geofence.checkin", {
       const stored = await storeSelfieProofLocal(ctx.vendorId, employeeId, p, Number((settings as any).tracking?.retentionDays ?? 90))
       proofId = stored
     }
+<<<<<<< HEAD
+    // M3 (T-12) — offline-capture classification: a punch recorded on-device
+    // while offline and submitted later stays a real punch, but a material
+    // capture→receipt delay flags the event OFFLINE_CAPTURE for HR review
+    // (clientTimestamp evidence preserved on the event row).
+    const offlineVerdict = offlineCaptureVerdict(p)
+    const baseSignals = [...(integrity?.signals ?? []), ...(deviceMismatch ? ["DEVICE_MISMATCH"] : [])]
+    const offlineEvent = applyOfflineCaptureToEvent(
+      deviceMismatch ? "REVIEW_REQUIRED" : (integrity ? integrityToEventStatus(integrity) : "ACCEPTED"),
+      baseSignals,
+      deviceMismatch
+        ? `Geo-fence check-in from an unregistered device — flagged for review`
+        : `Geo-fence check-in at ${fence.name} (${distance}m from center)`,
+      offlineVerdict,
+    )
+    const eventStatus = offlineEvent.status
+=======
     const eventStatus = deviceMismatch ? "REVIEW_REQUIRED" : (integrity ? integrityToEventStatus(integrity) : "ACCEPTED")
+>>>>>>> origin/main
     const event = await recordTrackingEvent(ctx.vendorId, employeeId, "CHECK_IN", "MOBILE", new Date(), {
       attendanceMethod: method,
       latitude: p.latitude ?? null, longitude: p.longitude ?? null, accuracyM: p.accuracyM ?? null,
@@ -973,10 +1113,15 @@ route("attendance.geofence.checkin", {
       selfieProofId: proofId,
       attendanceId: rec.id,
       status: eventStatus,
+<<<<<<< HEAD
+      reason: offlineEvent.reason,
+      flags: { signals: offlineEvent.signals, decision: offlineEvent.status === "REVIEW_REQUIRED" ? "REVIEW" : (integrity?.decision ?? "ALLOW") },
+=======
       reason: deviceMismatch
         ? `Geo-fence check-in from an unregistered device — flagged for review`
         : `Geo-fence check-in at ${fence.name} (${distance}m from center)`,
       flags: { signals: [...(integrity?.signals ?? []), ...(deviceMismatch ? ["DEVICE_MISMATCH"] : [])], decision: deviceMismatch ? "REVIEW" : (integrity?.decision ?? "ALLOW") },
+>>>>>>> origin/main
     })
     if (proofId && event) await db.attendanceProof.update({ where: { id: proofId }, data: { attendanceEventId: event.id } })
     await touchDeviceLastSeen(ctx.vendorId, employeeId, String(p.deviceId || ""), ctx.ip)
@@ -1007,6 +1152,15 @@ route("attendance.geofence.checkout", {
     if (!Number.isFinite(Number(p.latitude)) || !Number.isFinite(Number(p.longitude))) throw new Deny("GPS coordinates required for geo-fence check-out", 400)
     const emp = await db.employee.findFirst({ where: { id: employeeId, vendorId: ctx.vendorId } })
     if (!emp) throw new Deny("Employee not found", 404)
+<<<<<<< HEAD
+    // M3 (T-12) — mobile offline outbox replay (same contract as check-in:
+    // recorded outcome, no re-run side effects, before throttles/policy).
+    if (p.clientEventId) {
+      const replay = await findPunchReplay(ctx.vendorId, p.clientEventId, "co:")
+      if (replay) return punchReplayResponse(replay)
+    }
+=======
+>>>>>>> origin/main
     // SUB-107 — same GEOFENCE feature gate as check-in
     await requireFeature(ctx.vendorId, "GEOFENCE")
     const hasSelfie = !!p.selfieDataUrl
@@ -1061,7 +1215,22 @@ route("attendance.geofence.checkout", {
       const stored = await storeSelfieProofLocal(ctx.vendorId, employeeId, p, Number((settings as any).tracking?.retentionDays ?? 90))
       proofId = stored
     }
+<<<<<<< HEAD
+    // M3 (T-12) — offline-capture classification (same as check-in).
+    const offlineVerdict = offlineCaptureVerdict(p)
+    const baseSignalsCo = [...(integrity?.signals ?? []), ...(deviceMismatch ? ["DEVICE_MISMATCH"] : [])]
+    const offlineEventCo = applyOfflineCaptureToEvent(
+      deviceMismatch ? "REVIEW_REQUIRED" : (integrity ? integrityToEventStatus(integrity) : "ACCEPTED"),
+      baseSignalsCo,
+      deviceMismatch
+        ? `Geo-fence check-out from an unregistered device — flagged for review`
+        : `Geo-fence check-out at ${fence.name} (${distance}m, ${calc.status}, ${calc.overtimeMinutes}m OT)`,
+      offlineVerdict,
+    )
+    const eventStatus = offlineEventCo.status
+=======
     const eventStatus = deviceMismatch ? "REVIEW_REQUIRED" : (integrity ? integrityToEventStatus(integrity) : "ACCEPTED")
+>>>>>>> origin/main
     const event = await recordTrackingEvent(ctx.vendorId, employeeId, "CHECK_OUT", "MOBILE", new Date(), {
       attendanceMethod: method,
       latitude: p.latitude ?? null, longitude: p.longitude ?? null, accuracyM: p.accuracyM ?? null,
@@ -1076,10 +1245,15 @@ route("attendance.geofence.checkout", {
       selfieProofId: proofId,
       attendanceId: rec.id,
       status: eventStatus,
+<<<<<<< HEAD
+      reason: offlineEventCo.reason,
+      flags: { signals: offlineEventCo.signals, decision: offlineEventCo.status === "REVIEW_REQUIRED" ? "REVIEW" : (integrity?.decision ?? "ALLOW") },
+=======
       reason: deviceMismatch
         ? `Geo-fence check-out from an unregistered device — flagged for review`
         : `Geo-fence check-out at ${fence.name} (${distance}m, ${calc.status}, ${calc.overtimeMinutes}m OT)`,
       flags: { signals: [...(integrity?.signals ?? []), ...(deviceMismatch ? ["DEVICE_MISMATCH"] : [])], decision: deviceMismatch ? "REVIEW" : (integrity?.decision ?? "ALLOW") },
+>>>>>>> origin/main
     })
     if (proofId && event) await db.attendanceProof.update({ where: { id: proofId }, data: { attendanceEventId: event.id } })
     await touchDeviceLastSeen(ctx.vendorId, employeeId, String(p.deviceId || ""), ctx.ip)
@@ -1104,6 +1278,17 @@ route("attendance.selfie.checkin", {
     if (!employeeId) throw new Deny("No employee profile linked to your account")
     const emp = await db.employee.findFirst({ where: { id: employeeId, vendorId: ctx.vendorId } })
     if (!emp) throw new Deny("Employee not found", 404)
+<<<<<<< HEAD
+    // M3 (T-12) — mobile offline outbox replay (same contract as the geo
+    // routes). A replayed selfie punch returns the recorded outcome without
+    // storing the selfie bytes a second time — this is the no-duplicate-proof
+    // guarantee for retried uploads.
+    if (p.clientEventId) {
+      const replay = await findPunchReplay(ctx.vendorId, p.clientEventId, "si:")
+      if (replay) return punchReplayResponse(replay)
+    }
+=======
+>>>>>>> origin/main
     // M-14 — selfie throttle BEFORE any policy/db work (same preset as the geo routes)
     await guardSelfieRate(employeeId)
 
@@ -1223,7 +1408,24 @@ route("attendance.selfie.checkin", {
     const settings = await getSettings(ctx.vendorId)
     const proofId = await storeSelfieProofLocal(ctx.vendorId, employeeId, p, Number((settings as any).tracking?.retentionDays ?? 90))
 
+<<<<<<< HEAD
+    // M3 (T-12) — offline-capture classification (same as the geo routes).
+    const offlineVerdictSi = offlineCaptureVerdict(p)
+    const baseSignalsSi = [...(integrity?.signals ?? []), ...(deviceMismatch ? ["DEVICE_MISMATCH"] : [])]
+    const offlineEventSi = applyOfflineCaptureToEvent(
+      deviceMismatch ? "REVIEW_REQUIRED" : (integrity ? integrityToEventStatus(integrity) : "ACCEPTED"),
+      baseSignalsSi,
+      deviceMismatch
+        ? `Selfie check-in from an unregistered device — flagged for review`
+        : (fence
+          ? `Selfie check-in at ${fence.name} (${distance}m from center)`
+          : `Selfie check-in${hasGps ? " (outside fence hours/radius — recorded without fence match)" : " (no GPS fix)"}`),
+      offlineVerdictSi,
+    )
+    const eventStatus = offlineEventSi.status
+=======
     const eventStatus = deviceMismatch ? "REVIEW_REQUIRED" : (integrity ? integrityToEventStatus(integrity) : "ACCEPTED")
+>>>>>>> origin/main
     const event = await recordTrackingEvent(ctx.vendorId, employeeId, "CHECK_IN", "MOBILE", new Date(), {
       attendanceMethod: method,
       latitude: p.latitude ?? null, longitude: p.longitude ?? null, accuracyM: p.accuracyM ?? null,
@@ -1239,12 +1441,17 @@ route("attendance.selfie.checkin", {
       selfieProofId: proofId,
       attendanceId: rec.id,
       status: eventStatus,
+<<<<<<< HEAD
+      reason: offlineEventSi.reason,
+      flags: { signals: offlineEventSi.signals, decision: offlineEventSi.status === "REVIEW_REQUIRED" ? "REVIEW" : (integrity?.decision ?? "ALLOW") },
+=======
       reason: deviceMismatch
         ? `Selfie check-in from an unregistered device — flagged for review`
         : (fence
           ? `Selfie check-in at ${fence.name} (${distance}m from center)`
           : `Selfie check-in${hasGps ? " (outside fence hours/radius — recorded without fence match)" : " (no GPS fix)"}`),
       flags: { signals: [...(integrity?.signals ?? []), ...(deviceMismatch ? ["DEVICE_MISMATCH"] : [])], decision: deviceMismatch ? "REVIEW" : (integrity?.decision ?? "ALLOW") },
+>>>>>>> origin/main
     })
     if (proofId && event) await db.attendanceProof.update({ where: { id: proofId }, data: { attendanceEventId: event.id } })
     await touchDeviceLastSeen(ctx.vendorId, employeeId, String(p.deviceId || ""), ctx.ip)
@@ -1260,7 +1467,11 @@ route("attendance.selfie.checkin", {
 
     if (eventStatus === "REVIEW_REQUIRED" || eventStatus === "SUSPICIOUS") {
       await notify(ctx.vendorId, { role: "HR_ADMIN" }, "Attendance Needs Review",
+<<<<<<< HEAD
+        `Selfie check-in by ${emp.fullName} was flagged (${offlineVerdictSi.review ? "recorded offline and submitted later — verify the device timestamp" : (integrity?.status ?? "suspicious location")}) and requires review.`, "ATTENDANCE_SECURITY", "attendance")
+=======
         `Selfie check-in by ${emp.fullName} was flagged (${integrity?.status ?? "suspicious location"}) and requires review.`, "ATTENDANCE_SECURITY", "attendance")
+>>>>>>> origin/main
     }
     await audit(ctx, "attendance.selfie.checkin", "Attendance", rec.id,
       `Selfie check-in by ${emp.fullName}${fence ? ` at ${fence.name} (${distance}m from center)` : " (no GPS fix)"} — ${rec.status}${integrity && integrity.status !== "VERIFIED" ? `, integrity: ${integrity.status}` : ""}`)

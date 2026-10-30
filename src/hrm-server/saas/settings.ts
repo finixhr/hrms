@@ -332,10 +332,18 @@ export async function saveSaasSettingsGroup(group: string, values: Record<string
         stored = JSON.stringify(nums)
         break
       }
+<<<<<<< HEAD
+      default: {
+        if (typeof raw !== "string") continue
+        const isMedia = key.endsWith("Url") || key.includes("signature") || key.includes("seal") || key.includes("logo") || key.includes("favicon") || key.includes("Qr")
+        stored = isMedia ? raw.slice(0, 2_000_000) : raw.slice(0, 2000)
+      }
+=======
       default:
         if (typeof raw !== "string") continue
         const isMedia = key.endsWith("Url") || key.includes("signature") || key.includes("seal") || key.includes("logo") || key.includes("favicon") || key.includes("Qr")
         stored = isMedia ? raw.slice(0, 2_000_000) : raw.slice(0, 2000)
+>>>>>>> origin/main
     }
     await db.saasSetting.upsert({
       where: { group_key: { group, key } },

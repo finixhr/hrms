@@ -691,6 +691,12 @@ route("auth.me", {
 // session row (audited SUPPORT_ACCESS_ENDED) and clears the support cookie.
 // In-handler defense in depth: a NON-support context calling this is a 403 —
 // it would otherwise be a self-DoS vector for real tenant sessions.
+<<<<<<< HEAD
+  // INTENTIONALLY_SELF_SCOPED (M-02): identity-bound: ends ONLY the calling
+  // support context's own session (ctx.supportSession guard → 403 otherwise);
+  // no module permission applies to a support banner's exit affordance.
+=======
+>>>>>>> origin/main
 route("auth.supportExit", {
   handler: async (ctx) => {
     if (!ctx.supportSession) {

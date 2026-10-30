@@ -578,7 +578,11 @@ route("devices.events", {
     const page = Number(p?.page || 1), size = Math.min(Number(p?.size || 50), 200)
     const [total, rows] = await Promise.all([
       db.attendanceRawEvent.count({ where }),
+<<<<<<< HEAD
+      db.attendanceRawEvent.findMany({ where, orderBy: [{ eventTime: "desc" }, { id: "asc" }], skip: (page - 1) * size, take: size }),
+=======
       db.attendanceRawEvent.findMany({ where, orderBy: { eventTime: "desc" }, skip: (page - 1) * size, take: size }),
+>>>>>>> origin/main
     ])
     const devices = await db.attendanceDevice.findMany({ where: { vendorId: ctx.vendorId }, select: { id: true, name: true, deviceIdentifier: true, branchId: true } })
     const branches = await db.branch.findMany({ where: { vendorId: ctx.vendorId }, select: { id: true, name: true } })

@@ -10,6 +10,28 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { rpc } from "@/src/lib/api";
 import { useAuthStore } from "@/src/lib/auth";
+<<<<<<< HEAD
+import { Avatar, Card, StatChip, SectionHeader, EmptyState } from "@/src/components/ui";
+import { Colors, Spacing, Typography, Radius } from "@/src/theme";
+
+interface Stats {
+  // ess.dashboard contract (routes/ess.ts:350)
+  attendance: { present: number; late: number; absent: number; overtimeMinutes: number };
+  casualRemaining: number;
+  openTasks: number;
+  unreadNotifications: number;
+  activeLoans?: number;
+  pendingExpenses?: number;
+}
+
+interface AttToday {
+  checkIn?: string | null;
+  checkOut?: string | null;
+  status?: string;
+}
+
+interface Notification {
+=======
 import { Avatar, Card, Badge, StatChip, SectionHeader, EmptyState } from "@/src/components/ui";
 import { Colors, Spacing, Typography, Radius, Shadow } from "@/src/theme";
 
@@ -26,12 +48,18 @@ interface Stats {
 }
 
 interface Activity {
+>>>>>>> origin/main
   id: string;
   title: string;
   message: string;
   type: string;
+<<<<<<< HEAD
+  readAt?: string | null;
+  createdAt: string;
+=======
   createdAt: string;
   read: boolean;
+>>>>>>> origin/main
 }
 
 const QUICK_ACTIONS = [
@@ -53,6 +81,26 @@ function greet() {
 export default function HomeScreen() {
   const { user }        = useAuthStore();
   const router          = useRouter();
+<<<<<<< HEAD
+  const [stats, setStats]         = useState<Stats | null>(null);
+  const [today, setToday]         = useState<AttToday | null>(null);
+  const [activity, setActivity]   = useState<Notification[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (_silent = false) => {
+    try {
+      // Employee-plane contracts: ess.dashboard (personal KPIs),
+      // ess.attendance (today's punch pair), notifications.list (bare array —
+      // the old code read `.data` from a response that has no wrapper).
+      const [s, a, n] = await Promise.allSettled([
+        rpc<Stats>("ess.dashboard", {}),
+        rpc<{ today: AttToday | null }>("ess.attendance", {}),
+        rpc<Notification[]>("notifications.list", {}),
+      ]);
+      if (s.status === "fulfilled") setStats(s.value);
+      if (a.status === "fulfilled") setToday(a.value?.today ?? null);
+      if (n.status === "fulfilled") setActivity((n.value ?? []).slice(0, 5));
+=======
   const [stats, setStats]       = useState<Stats | null>(null);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,6 +113,7 @@ export default function HomeScreen() {
       ]);
       if (s.status === "fulfilled") setStats(s.value);
       if (a.status === "fulfilled") setActivity(a.value.data ?? []);
+>>>>>>> origin/main
     } finally {
       setRefreshing(false);
     }
@@ -94,29 +143,50 @@ export default function HomeScreen() {
           <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
             <View style={{ alignItems: "center" }}>
               <Text style={styles.todayLabel}>Check-in</Text>
+<<<<<<< HEAD
+              <Text style={styles.todayVal}>{today?.checkIn ? new Date(today.checkIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—:——"}</Text>
+=======
               <Text style={styles.todayVal}>{stats?.myCheckin ? new Date(stats.myCheckin).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—:——"}</Text>
+>>>>>>> origin/main
             </View>
             <View style={styles.todayDivider} />
             <View style={{ alignItems: "center" }}>
               <Text style={styles.todayLabel}>Check-out</Text>
+<<<<<<< HEAD
+              <Text style={styles.todayVal}>{today?.checkOut ? new Date(today.checkOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—:——"}</Text>
+=======
               <Text style={styles.todayVal}>{stats?.myCheckout ? new Date(stats.myCheckout).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—:——"}</Text>
+>>>>>>> origin/main
             </View>
             <View style={styles.todayDivider} />
             <View style={{ alignItems: "center" }}>
               <Text style={styles.todayLabel}>Leave Bal.</Text>
+<<<<<<< HEAD
+              <Text style={styles.todayVal}>{stats?.casualRemaining ?? "—"}</Text>
+=======
               <Text style={styles.todayVal}>{stats?.myLeaveBalance ?? "—"}</Text>
+>>>>>>> origin/main
             </View>
           </View>
         </View>
       </LinearGradient>
 
       <View style={styles.body}>
+<<<<<<< HEAD
+        {/* ── Stats row (this month, from ess.dashboard) ── */}
+        <View style={{ flexDirection: "row", gap: Spacing.sm }}>
+          <StatChip value={stats?.attendance?.present ?? "—"} label="Present" color={Colors.success} />
+          <StatChip value={stats?.attendance?.absent  ?? "—"} label="Absent"  color={Colors.danger}  />
+          <StatChip value={stats?.attendance?.late    ?? "—"} label="Late"    color={Colors.warning} />
+          <StatChip value={stats?.openTasks ?? "—"} label="Tasks" color={Colors.primary} />
+=======
         {/* ── Stats row ─────────────────────────────────── */}
         <View style={{ flexDirection: "row", gap: Spacing.sm }}>
           <StatChip value={stats?.presentToday ?? "—"} label="Present" color={Colors.success} />
           <StatChip value={stats?.absentToday  ?? "—"} label="Absent"  color={Colors.danger}  />
           <StatChip value={stats?.lateToday    ?? "—"} label="Late"    color={Colors.warning} />
           <StatChip value={stats?.pendingLeaves ?? "—"} label="Pending" color={Colors.primary} />
+>>>>>>> origin/main
         </View>
 
         {/* ── Quick actions ─────────────────────────────── */}
@@ -143,7 +213,11 @@ export default function HomeScreen() {
           ) : (
             activity.map(n => (
               <Card key={n.id} style={{ flexDirection: "row", gap: Spacing.md, padding: Spacing.md }}>
+<<<<<<< HEAD
+                <View style={[styles.actDot, { backgroundColor: n.readAt ? Colors.border : Colors.primary }]} />
+=======
                 <View style={[styles.actDot, { backgroundColor: n.read ? Colors.border : Colors.primary }]} />
+>>>>>>> origin/main
                 <View style={{ flex: 1 }}>
                   <Text style={Typography.h4} numberOfLines={1}>{n.title}</Text>
                   <Text style={[Typography.bodyS, { marginTop: 2 }]} numberOfLines={2}>{n.message}</Text>

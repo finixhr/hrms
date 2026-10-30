@@ -375,7 +375,11 @@ route("settings.save", {
     // server-side and the Vendor.name mirror is removed. legalName, address,
     // phone, email, logo and the signatory fields remain tenant-editable.
     if (p.group === "general" && p.values && typeof p.values === "object") {
+<<<<<<< HEAD
+      const { companyName: _companyName, ...rest } = p.values as Record<string, unknown>
+=======
       const { companyName, ...rest } = p.values as Record<string, unknown>
+>>>>>>> origin/main
       p.values = rest
     }
     await saveSettingsGroup(ctx.vendorId, p.group, p.values || {})

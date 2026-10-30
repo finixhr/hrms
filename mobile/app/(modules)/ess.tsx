@@ -10,6 +10,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useFetch } from "@/src/hooks/useFetch";
 import { Card, Badge, EmptyState, SectionHeader, Avatar } from "@/src/components/ui";
+<<<<<<< HEAD
+import { Colors, Spacing, Typography } from "@/src/theme";
+import { useAuthStore } from "@/src/lib/auth";
+
+interface Announcement {
+  // announcements.list (routes/communication.ts:80) — bare array; model has
+  // no `priority` field (pinned is the signal).
+  id: string; title: string; body: string; pinned?: boolean; createdAt: string;
+}
+interface Document {
+  // ess.documents (routes/ess.ts:287) — { docs, letters }
+  id: string; docType: string; title: string; status: string; verified?: boolean; expiryDate?: string | null;
+}
+interface Reimbursement {
+  // ess.expenses (routes/ess.ts:248) — bare array of own ExpenseClaim rows
+=======
 import { Colors, Spacing, Typography, Radius } from "@/src/theme";
 import { useAuthStore } from "@/src/lib/auth";
 
@@ -20,6 +36,7 @@ interface Document {
   id: string; name: string; type: string; createdAt: string;
 }
 interface Reimbursement {
+>>>>>>> origin/main
   id: string; title: string; amount: number; status: string; date: string;
 }
 
@@ -37,6 +54,15 @@ const ESS_SHORTCUTS = [
 export default function EssScreen() {
   const { user } = useAuthStore();
   const router   = useRouter();
+<<<<<<< HEAD
+  const { data: announcements, refreshing: r1, refresh: re1 } = useFetch<Announcement[]>("announcements.list", {});
+  const { data: docsData,      refreshing: r2, refresh: re2 } = useFetch<{ docs: Document[] }>("ess.documents", {});
+  const { data: reimbs,        refreshing: r3, refresh: re3 } = useFetch<Reimbursement[]>("ess.expenses", {});
+
+  const annList   = (announcements ?? []).slice(0, 5);
+  const docList   = docsData?.docs ?? [];
+  const reimbList = reimbs ?? [];
+=======
   const { data: announcements, refreshing: r1, refresh: re1 } = useFetch<{ data: Announcement[] }>("announcements.list", { page: 1, limit: 5 });
   const { data: docs,          refreshing: r2, refresh: re2 } = useFetch<{ data: Document[] }>("ess.myDocuments", { page: 1 });
   const { data: reimbs,        refreshing: r3, refresh: re3 } = useFetch<{ data: Reimbursement[] }>("roadmap.myReimbursements", { page: 1 });
@@ -44,6 +70,7 @@ export default function EssScreen() {
   const annList   = announcements?.data ?? [];
   const docList   = docs?.data          ?? [];
   const reimbList = reimbs?.data        ?? [];
+>>>>>>> origin/main
   const refreshing = r1 || r2 || r3;
 
   return (
@@ -86,7 +113,11 @@ export default function EssScreen() {
               <View style={styles.annHeader}>
                 <View style={styles.annDot} />
                 <Text style={[Typography.h4, { flex: 1 }]} numberOfLines={1}>{a.title}</Text>
+<<<<<<< HEAD
+                {a.pinned && <Badge label="PINNED" />}
+=======
                 {a.priority === "HIGH" && <Badge label="HIGH" />}
+>>>>>>> origin/main
               </View>
               <Text style={[Typography.bodyS, { marginTop: Spacing.sm }]} numberOfLines={3}>{a.body}</Text>
               <Text style={[Typography.caption, { marginTop: Spacing.sm }]}>
@@ -107,10 +138,19 @@ export default function EssScreen() {
                 <Ionicons name="document-text" size={20} color={Colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
+<<<<<<< HEAD
+                <Text style={Typography.h4} numberOfLines={1}>{d.title}</Text>
+                <Text style={Typography.bodyS}>
+                  {d.docType}{d.expiryDate ? ` · Expires ${new Date(d.expiryDate).toLocaleDateString()}` : ""}
+                </Text>
+              </View>
+              <Badge label={d.verified ? "Verified" : d.status} />
+=======
                 <Text style={Typography.h4} numberOfLines={1}>{d.name}</Text>
                 <Text style={Typography.bodyS}>{d.type} · {new Date(d.createdAt).toLocaleDateString()}</Text>
               </View>
               <Ionicons name="download-outline" size={18} color={Colors.textTertiary} />
+>>>>>>> origin/main
             </Card>
           ))
         }

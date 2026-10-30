@@ -264,7 +264,11 @@ route("resignations.list", {
     const page = Math.max(1, Number(p?.page) || 1)
     const [list, total, byStatus] = paged
       ? await Promise.all([
+<<<<<<< HEAD
+          db.resignation.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
+=======
           db.resignation.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+>>>>>>> origin/main
           db.resignation.count({ where }),
           db.resignation.groupBy({ by: ["status"], where: scopeWhere, _count: { _all: true } }),
         ])

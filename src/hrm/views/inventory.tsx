@@ -1077,7 +1077,11 @@ function ItemDialog({ edit, onClose }: { edit: any; onClose: (saved: boolean) =>
           <div className="space-y-1.5"><Label className="text-xs font-medium">Reorder level</Label><Input type="number" value={v.reorderLevel} onChange={(e) => set("reorderLevel", e.target.value)} className="h-9 tabular-nums" /></div>
 
           <div className="col-span-2 space-y-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+<<<<<<< HEAD
+            <Label className="text-xs font-medium">Is it returnable to company during holder&apos;s leave from company?</Label>
+=======
             <Label className="text-xs font-medium">Is it returnable to company during holder's leave from company?</Label>
+>>>>>>> origin/main
             <div className="flex items-center justify-between h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <span className="text-xs text-slate-600 dark:text-slate-300">
                 {v.isReturnable

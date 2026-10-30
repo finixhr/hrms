@@ -1,0 +1,40 @@
+# Finix HR — Technical Debt Register
+
+> Living register. Each item: what, evidence, cost of inaction, disposition (backlog ID from `MASTER_IMPLEMENTATION_PLAN.md`).
+> Created 2026-10-30. Items are removed only when resolved with proof.
+
+| # | Debt item | Evidence (file:line / run) | Cost of inaction | Disposition |
+|---|---|---|---|---|
+| TD-1 | **Hosted CI masking** (typecheck `\|\| true`; test exit via `tail`; no lint; no mobile) | `.github/workflows/ci.yml:59,65` | False-green merges; regressions ship | **RESOLVED 2026-10-30** (T-01) — hard-fail gates, ci.sh integration, mobile job |
+| TD-2 | **Mobile contract drift — 23 missing actions, 4 wrong payloads** | `API_CONTRACT_AUDIT.md` §2 | Mobile app non-functional | **RESOLVED 2026-10-30** (T-02…T-06) — rewired to real contracts + contract test |
+| TD-3 | **Schema drift (DeviceToken SQL defaults)** | `check-schema-drift.ts` output 2026-10-30 | Production DB shape ≠ tested shape | **RESOLVED 2026-10-30** (T-07) — migration 11 added; gate green |
+| TD-4 | **13 pre-existing unit-test failures** | health report §4 | Unproven business/security guarantees | T-10 (P1) |
+| TD-5 | **87 ESLint errors** (react-hooks/refs etc.) | `bun run lint` 2026-10-30 | Hidden hook bugs; noise hides signal | T-11 (P1) |
+| TD-6 | **Bun lockfile unparsable by Bun 1.3.14** | baseline #11 | Non-reproducible installs; CI break risk | T-08 (CI pin applied; full regenerate deferred — needs product sign-off on resolution drift) |
+| TD-7 | **Unprefixed route modules** (`performance.ts`, `roadmap.ts` flat names) | contract audit §5.1 | Client namespace confusion (caused TD-2's imagined API) | T-20 (P2) |
+| TD-8 | **`leaveRequests.apply` `.passthrough()`** | `validation.ts:236` | Silent junk fields; schema lies | T-25-adjacent (careful — web SPA compatibility) |
+| TD-9 | **`ess.leave` unbounded request history** | `routes/ess.ts:87` (no `take`) | Payload growth over employee tenure | T-18 (P1) |
+| TD-10 | **`notifications.list` ignores pagination params** | `routes/communication.ts:44-52` | Clients believe they paginate; they don't | Documented in contract audit; fix with ESS-plane polish |
+| TD-11 | **Desktop shell minimal** (no single-instance, window-state, auto-update, notifications, deep links; CSP was null) | `desktop/src-tauri/*` | Weak managed-app experience; security posture | CSP fixed (T-09); remainder T-22 (P2) |
+| TD-12 | **tauri.conf.json mojibake + hardcoded certificateThumbprint** | `tauri.conf.json:46,49` | Unprofessional bundle metadata; signing config in VCS | Fixed mojibake 2026-10-30; thumbprint → T-29 |
+| TD-13 | **Corrupted `.git` in vendor drop** (re-initialized) | health report §6 | Lost history; commit-attribution ambiguity | Accepted (documented); GitHub push pending credentials |
+| TD-14 | **`attendance.today` misleading name** (HR grid, array shape) | `routes/attendance.ts:273` | Future clients repeat the mobile mistake | Renaming = breaking change; documented in contract audit §5.4 |
+| TD-15 | **Monolithic route files** (`employees.ts` 2244 lines, `reports.ts` 2327, `attendance.ts` 1512…) | `wc -l` 2026-10-30 | Review friction; merge conflicts | Accepted short-term; split only when touched (directive: no unrelated refactors) |
+| TD-16 | **Migration folder naming** (`9_wave9z[a-s]…` 20+ sub-migrations under one prefix) | `prisma/migrations/` | Ordering readability | Accepted; additive-only policy maintained |
+| TD-17 | **Blocked postinstall** (`bun pm untrusted`) | install log 2026-10-30 | Supply-chain surface unreviewed | T-28 (P3) |
+| TD-18 | **Blueprint docs live outside repo** | `download/finix-hr-uiux-blueprint/` | Repo not self-contained; docs drift | T-23 (P2) |
+| TD-19 | **Mobile has no offline strategy** | `mobile/` (no outbox) | Field-use failure; duplicate-punch risk mitigated only online | **RESOLVED 2026-10-30** (T-12/M3) — persistent outbox (geofence punches) + server idempotent replay; see `OFFLINE_OUTBOX.md`. Leave/other actions remain online-only (deliberate scope) |
+| TD-20 | **Mobile module registry not permission-aware (pre-fix)** | `mobile/app/(tabs)/modules.tsx` | Employees see modules they cannot use | **RESOLVED 2026-10-30** (T-06) — permission gating via `auth.me` |
+| TD-21 | **Term-invoice dedupe relies on advisory lock only** — no partial unique index on `(subscriptionId, periodStart, periodEnd) WHERE kind='TERM' AND status<>'CANCELLED'` | `saas/payments/billing-ops.ts` (T-10 fix) | Writers bypassing `createTermInvoice` could still duplicate; the index also hardens cross-instance races | Deferred DELIBERATELY: needs a dirty-data review before `migrate deploy` (existing duplicates would fail the migration loudly). Add with drift-gate allowlist entry when scheduled. |
+| TD-22 | **9 advisory lint warnings** (`import/no-anonymous-default-export` ×5 etc.) | `bun run lint` after T-11 | Cosmetic; no gate impact | Batch with T-21 conformance sweep |
+| TD-23 | **Mobile eslint lane crashes on rule load** (`@typescript-eslint/no-unused-expressions` → TypeError while linting `babel.config.js`) — root `@typescript-eslint` v8+ plugin resolved by mobile-local eslint 8.57.1 | `mobile/` (reproduced on clean HEAD 2026-10-30; pre-existing in the vendor baseline) | Mobile source has NO lint gate at all (CI mobile job = typecheck + expo-doctor only) | Deferred: fixing requires dependency surgery on the Expo app's eslint stack (version-align root vs mobile) — not mid-milestone. Mobile typecheck remains the gate; flagged for T-21 conformance sweep |
+| TD-24 | **Hosted CI never actually run** — repo has no GitHub remote, no credentials, no gh CLI in the build environment | `.git/` (no remotes), env audit 2026-10-30 | M3-E unverified on real runners; workflow + local gate parity is the only evidence | **BLOCKED — environmental**: requires repo ownership + a push credential. Workflow file verified (trigger `push/PR → main/develop/master`, jobs web/mobile/docker-build) and the exact stage it runs (`scripts/ci.sh`, `E2E_SKIP=1`) exits 0 locally. Re-run verification the moment a remote + token exist |
+| TD-25 | **Offline outbox leave-eligibility absent** — `leaveRequests.apply` has no server-side idempotency key, so leave requests cannot be safely queued offline | `src/hrm-server/validation.ts` (S.leaveApply) | Offline leave apply would risk duplicate requests on retry | Deliberate scope (directive: attendance only). Requires a server idempotency contract first — candidate T-25 |
+
+---
+
+## Register rules
+
+1. New debt discovered during any task is added here BEFORE the task is marked complete.
+2. A "RESOLVED" entry must cite the proof (test/gate/commit).
+3. Debt is never silently deleted — superseded items are annotated.

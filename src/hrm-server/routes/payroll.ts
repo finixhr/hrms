@@ -429,7 +429,11 @@ route("payroll.entries", {
     const page = Math.max(1, Number(p?.page) || 1)
     const [entries, total] = paged
       ? await Promise.all([
+<<<<<<< HEAD
+          db.payrollEntry.findMany({ where, orderBy: [{ net: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
+=======
           db.payrollEntry.findMany({ where, orderBy: { net: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+>>>>>>> origin/main
           db.payrollEntry.count({ where }),
         ])
       : [await db.payrollEntry.findMany({ where, orderBy: { net: "desc" } }), null]
@@ -1009,7 +1013,11 @@ route("payslips.list", {
     const [entries, total] = paged
       ? await Promise.all([
           db.payrollEntry.findMany({
+<<<<<<< HEAD
+            where: { ...where, payslipNumber: { not: null } }, orderBy: [{ payslipNumber: "desc" }, { id: "asc" }],
+=======
             where: { ...where, payslipNumber: { not: null } }, orderBy: { payslipNumber: "desc" },
+>>>>>>> origin/main
             skip: (page - 1) * pageSize, take: pageSize,
           }),
           db.payrollEntry.count({ where: { ...where, payslipNumber: { not: null } } }),

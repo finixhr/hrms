@@ -2932,8 +2932,16 @@ function UpdateHierarchyDialog({
   const [selectedSubordinateId, setSelectedSubordinateId] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+<<<<<<< HEAD
+  // Sync props when dialog opens (T-11: was a useMemo-with-setState —
+  // setState during render via useMemo is the exact pattern the
+  // react-hooks/set-state-in-render rule exists for; useEffect is the
+  // honest primitive for prop-sync-on-open)
+  useEffect(() => {
+=======
   // Sync props when dialog opens
   useMemo(() => {
+>>>>>>> origin/main
     setActiveTab(initialTab)
     setSelectedEmpId(targetEmpId || allEmployees[0]?.id || "")
     const target = allEmployees.find((e) => e.id === targetEmpId)

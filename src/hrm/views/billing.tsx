@@ -114,7 +114,10 @@ export default function BillingView() {
   const { data: instructions } = useApi<{ instructions: string | null; supportEmail: string | null } | any>("billing.paymentInstructions", {})
   const { data: reqData, reload: reloadRequests } = useApi<{ rows: RequestRow[]; pending: boolean }>(canSeeCatalog ? "billing.planChangeRequests" : null, {})
   const [tab, setTab] = useState<string>(presetTab && ["overview", "invoices", "plans", "usage"].includes(presetTab) ? presetTab : "overview")
+<<<<<<< HEAD
+=======
   const [busy, setBusy] = useState<string | null>(null)
+>>>>>>> origin/main
   const [renewOpen, setRenewOpen] = useState(false)
   const [payTarget, setPayTarget] = useState<PayTarget | null>(null)
   const [viewInvoice, setViewInvoice] = useState<InvoiceRow | null>(null)
@@ -125,12 +128,15 @@ export default function BillingView() {
 
   const reloadAll = useCallback(() => { reload(); reloadInvoices() }, [reload, reloadInvoices])
 
+<<<<<<< HEAD
+=======
   const act = async (kind: string, fn: () => Promise<void>) => {
     setBusy(kind)
     try { await fn(); toast(`${kind} completed`, "ok"); reloadAll() }
     catch (e: any) { toast(String(e?.message || e), "err") }
     finally { setBusy(null) }
   }
+>>>>>>> origin/main
 
   if (loading) {
     return (
@@ -282,7 +288,11 @@ export default function BillingView() {
             )}
 
             <SectionCard title="Current Plan" actions={canManage && !legacy && (
+<<<<<<< HEAD
+              <Button size="sm" className="h-8 text-xs gap-1" onClick={() => setRenewOpen(true)}>
+=======
               <Button size="sm" className="h-8 text-xs gap-1" disabled={!!busy} onClick={() => setRenewOpen(true)}>
+>>>>>>> origin/main
                 <RefreshCw className="h-3.5 w-3.5" /> Renew for another cycle
               </Button>
             )}>
@@ -917,7 +927,10 @@ function InvoiceViewDialog({ invoiceId, onClose }: { invoiceId: string; onClose:
   const platformName = gs?.platformName || "Finix HR"
   const tagline = gs?.tagline || "Standalone HRM & Workforce Platform"
   const companyAddress = gs?.address || bs.companyAddress || "House 11, Road 6, Sector 16/A, Uttara, Dhaka - 1230"
+<<<<<<< HEAD
+=======
   const companyPhone = gs?.supportPhone || bs.companyPhone || "+8809643666888"
+>>>>>>> origin/main
   const companyEmail = gs?.supportEmail || bs.companyEmail || "service@finixhr.com"
   const companyWebsite = gs?.websiteUrl || (bs.companyWebsite ? (bs.companyWebsite.startsWith("http") ? bs.companyWebsite : `https://${bs.companyWebsite}`) : "https://hrm.finixmart.com.bd")
   const logoUrl = gs?.logoUrl || ""

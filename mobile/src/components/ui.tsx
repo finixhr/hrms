@@ -7,9 +7,13 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+<<<<<<< HEAD
+  ViewStyle,
+=======
   StyleSheet,
   ViewStyle,
   TextStyle,
+>>>>>>> origin/main
   TextInputProps,
   StyleProp,
   DimensionValue,

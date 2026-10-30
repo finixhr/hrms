@@ -22,7 +22,11 @@
                                 }
                             ],
                 "security":  {
+<<<<<<< HEAD
+                                 "csp":  "default-src 'self' https: http:; script-src 'self' https: http: 'unsafe-inline'; style-src 'self' 'unsafe-inline' https: http:; img-src 'self' data: blob: https: http:; font-src 'self' data: https: http:; connect-src 'self' https: http: ws: wss:; object-src 'none'; base-uri 'self'"
+=======
                                  "csp":  null
+>>>>>>> origin/main
                              }
             },
     "bundle":  {
@@ -43,7 +47,11 @@
                                    ],
                    "copyright":  "",
                    "category":  "Business",
+<<<<<<< HEAD
+                   "shortDescription":  "Finix HR — Human Resources Management",
+=======
                    "shortDescription":  "Finix HR â€” Human Resources Management",
+>>>>>>> origin/main
                    "longDescription":  "Finix HR desktop application for Windows and macOS, wrapping the full Finix HR web application in a native window.",
                    "windows":  {
                                    "certificateThumbprint":  "250456C96E034A86C2581EC81B1D044347AB71C4",

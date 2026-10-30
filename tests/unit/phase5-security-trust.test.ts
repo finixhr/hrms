@@ -63,6 +63,19 @@ describe("P4 — owner.security.overview (team census + login windows + reasons 
   const TAG = uniq("p4ov")
   const ownerEmails = [`${TAG}-a@test.local`, `${TAG}-b@test.local`, `${TAG}-c@test.local`, `${TAG}-d@test.local`]
   const loginEmail = `${uniq("lu")}@test.local`
+<<<<<<< HEAD
+  // Deterministic, collision-proof IPs (documentation ranges, fixed slots
+  // ≥ 201 — outside every random 10–209 range used elsewhere in the suite).
+  // These were previously Math.random()-drawn from THREE shared ranges, so a
+  // same-range collision (p ≈ 1/200 per pair) could merge fixtures and fail
+  // the ordering/exclusion assertions — a latent flake, not a server bug.
+  const IP_A = "203.0.113.201"
+  const IP_B = "198.51.100.201"
+  const IP_C = "192.0.2.201"
+  const IP_D = "203.0.113.202"
+  const IP_E = "198.51.100.202"
+  const IP_F = "192.0.2.202"
+=======
   // collision-proof IPs (documentation ranges, uniq per run)
   const IP_A = `203.0.113.${Math.floor(Math.random() * 200) + 10}`
   const IP_B = `198.51.100.${Math.floor(Math.random() * 200) + 10}`
@@ -70,6 +83,7 @@ describe("P4 — owner.security.overview (team census + login windows + reasons 
   const IP_D = `203.0.113.${Math.floor(Math.random() * 200) + 10}`
   const IP_E = `198.51.100.${Math.floor(Math.random() * 200) + 10}`
   const IP_F = `192.0.2.${Math.floor(Math.random() * 200) + 10}`
+>>>>>>> origin/main
   let ownerA: string, ownerB: string
 
   beforeAll(async () => {

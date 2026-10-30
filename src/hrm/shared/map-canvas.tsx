@@ -76,7 +76,18 @@ export default function MapCanvas(props: MapCanvasProps) {
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cbRef = useRef(props)
+<<<<<<< HEAD
+  // T-11 — ref writes belong to effects, not render. This runs after every
+  // commit and BEFORE the map effect below (declaration order), so the
+  // long-lived Leaflet instance always reads fresh props without
+  // re-initializing on every prop change (the "latest props ref" pattern,
+  // effect-flavored).
+  useEffect(() => {
+    cbRef.current = props
+  })
+=======
   cbRef.current = props
+>>>>>>> origin/main
 
   useEffect(() => {
     let cancelled = false

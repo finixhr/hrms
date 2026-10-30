@@ -2176,18 +2176,34 @@ export function CommissionCalculateDialog({
   }, [filteredEntriesWithIdx, currentPage, pageSize])
 
   // Results search & pagination
+<<<<<<< HEAD
+  // T-11 — optional-chained expressions in dependency lists defeat the
+  // React Compiler's memoization preservation; the value is lifted to a
+  // plain local first.
+  const resultBonuses = result?.bonuses
+  const filteredBonuses = useMemo(() => {
+    if (!resultBonuses) return []
+    if (!resultSearch.trim()) return resultBonuses
+    const q = resultSearch.trim().toLowerCase()
+    return resultBonuses.filter((b: any) => {
+=======
   const filteredBonuses = useMemo(() => {
     if (!result?.bonuses) return []
     if (!resultSearch.trim()) return result.bonuses
     const q = resultSearch.trim().toLowerCase()
     return result.bonuses.filter((b: any) => {
+>>>>>>> origin/main
       return (
         (b.employeeName && b.employeeName.toLowerCase().includes(q)) ||
         (b.employeeCode && b.employeeCode.toLowerCase().includes(q)) ||
         (b.ruleName && b.ruleName.toLowerCase().includes(q))
       )
     })
+<<<<<<< HEAD
+  }, [resultBonuses, resultSearch])
+=======
   }, [result?.bonuses, resultSearch])
+>>>>>>> origin/main
 
   const totalResultPages = Math.max(1, Math.ceil(filteredBonuses.length / resultPageSize))
   const currentResultPage = Math.min(resultPage, totalResultPages)

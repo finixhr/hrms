@@ -1,6 +1,10 @@
 // Modules hub — gateway to all 40+ HRM modules with colour-coded cards
 
+<<<<<<< HEAD
+import { useState } from "react";
+=======
 import { useCallback, useRef } from "react";
+>>>>>>> origin/main
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Platform, StatusBar, TextInput, FlatList,
@@ -8,8 +12,13 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+<<<<<<< HEAD
+import { Colors, Spacing, Radius } from "@/src/theme";
+import { useAuthStore } from "@/src/lib/auth";
+=======
 import { Colors, Spacing, Typography, Radius, Shadow } from "@/src/theme";
 import { useState } from "react";
+>>>>>>> origin/main
 
 // ── Module catalogue ───────────────────────────────────────────────────────
 interface Module {
@@ -21,10 +30,48 @@ interface Module {
   gradient: [string, string];
   route: string;
   tag?: string;
+<<<<<<< HEAD
+  /** Required permission ("module.view") — absent = employee-plane module.
+   * Source of truth: `perm: [...]` tuples in src/hrm-server/routes/*.ts —
+   * pinned by tests/unit/mobile-contract.test.ts (T-17). */
+  perm?: string;
+=======
+>>>>>>> origin/main
 }
 
 const MODULES: Module[] = [
   // People
+<<<<<<< HEAD
+  { id: "employees",    title: "Employees",      subtitle: "Directory & profiles",       icon: "people",              color: "#4F46E5", gradient: ["#4F46E5","#6366F1"] as [string,string], route: "/(modules)/employees",    tag: "People", perm: "employees.view" },
+  { id: "onboarding",   title: "Onboarding",     subtitle: "New hire checklist",          icon: "person-add",          color: "#7C3AED", gradient: ["#7C3AED","#8B5CF6"] as [string,string], route: "/(modules)/[module]?module=onboarding",   tag: "People", perm: "dashboard.view" },  // onboarding.ts actions gate on dashboard.view
+  { id: "exit",         title: "Exit",            subtitle: "Offboarding & clearance",    icon: "person-remove",       color: "#6B7280", gradient: ["#6B7280","#9CA3AF"] as [string,string], route: "/(modules)/[module]?module=exit",         tag: "People", perm: "exit.view" },
+  { id: "recruitment",  title: "Recruitment",     subtitle: "Jobs, pipelines & ATS",      icon: "briefcase",           color: "#06B6D4", gradient: ["#06B6D4","#0EA5E9"] as [string,string], route: "/(modules)/recruitment",  tag: "People", perm: "recruitment.view" },
+  // Time & Attendance
+  { id: "attendance",   title: "Attendance",      subtitle: "Punches & corrections",      icon: "time",                color: "#4F46E5", gradient: ["#4F46E5","#06B6D4"], route: "/(tabs)/attendance",      tag: "Time"      },
+  { id: "leave",        title: "Leave",           subtitle: "Requests & balances",        icon: "calendar",            color: "#10B981", gradient: ["#10B981","#059669"], route: "/(tabs)/leave",           tag: "Time"      },
+  { id: "shift",        title: "Rosters",         subtitle: "Shift planning & rosters",   icon: "calendar-number",    color: "#F59E0B", gradient: ["#F59E0B","#D97706"], route: "/(modules)/rosters",      tag: "Time", perm: "shifts.view" },
+  { id: "tracking",     title: "Live Tracking",   subtitle: "GPS & geo-fencing",          icon: "map",                 color: "#DC2626", gradient: ["#DC2626","#EF4444"], route: "/(modules)/tracking",     tag: "Time", perm: "tracking.view" },
+  { id: "fieldforce",   title: "Field Force",     subtitle: "Plans, visits & routes",     icon: "navigate",            color: "#0EA5E9", gradient: ["#0EA5E9","#06B6D4"], route: "/(modules)/fieldforce",   tag: "Time", perm: "fieldforce.view" },
+  // Payroll & Finance
+  { id: "payroll",      title: "Payroll",         subtitle: "Payslips & processing",      icon: "cash",                color: "#F59E0B", gradient: ["#F59E0B","#F97316"] as [string,string], route: "/(modules)/payroll",      tag: "Finance"   },
+  { id: "ait",          title: "Tax (AIT)",        subtitle: "Income tax slabs & calc",    icon: "calculator",          color: "#8B5CF6", gradient: ["#8B5CF6","#7C3AED"] as [string,string], route: "/(modules)/[module]?module=ait",          tag: "Finance", perm: "ait.view" },
+  { id: "pf",           title: "Provident Fund",  subtitle: "PF contributions & loans",   icon: "wallet",              color: "#10B981", gradient: ["#10B981","#059669"] as [string,string], route: "/(modules)/[module]?module=pf",           tag: "Finance", perm: "payroll.view" },  // pf.ts actions gate on payroll.*
+  { id: "finance",      title: "Finance",         subtitle: "Loans, advances & expenses", icon: "trending-up",         color: "#EF4444", gradient: ["#EF4444","#DC2626"] as [string,string], route: "/(modules)/[module]?module=finance",      tag: "Finance", perm: "loans.view" },  // finance.ts loans/advances/expenses admin
+  { id: "accounting",   title: "Accounting",      subtitle: "Vouchers, ledger & P&L",     icon: "stats-chart",         color: "#6366F1", gradient: ["#6366F1","#4F46E5"] as [string,string], route: "/(modules)/[module]?module=accounting",   tag: "Finance", perm: "accounting.view" },
+  { id: "commissions",  title: "Commissions",     subtitle: "Sales commission rules",     icon: "ribbon",              color: "#F97316", gradient: ["#F97316","#EA580C"] as [string,string], route: "/(modules)/[module]?module=commissions",  tag: "Finance", perm: "bonus.view" },  // commissions.ts actions gate on bonus.*
+  { id: "payout",       title: "Payout",          subtitle: "Salary disbursement",        icon: "send",                color: "#14B8A6", gradient: ["#14B8A6","#0D9488"] as [string,string], route: "/(modules)/[module]?module=payout",       tag: "Finance", perm: "payroll.view" },  // payout.ts actions gate on payroll.*
+  // Self Service
+  { id: "ess",          title: "Self Service",    subtitle: "Payslips, docs & profile",   icon: "person-circle",       color: "#EC4899", gradient: ["#EC4899","#DB2777"] as [string,string], route: "/(modules)/ess",          tag: "ESS"       },
+  { id: "letters",      title: "Letters",         subtitle: "Experience & offer letters", icon: "document-text",       color: "#6366F1", gradient: ["#6366F1","#4F46E5"] as [string,string], route: "/(modules)/[module]?module=letters",      tag: "ESS", perm: "letters.view" },
+  { id: "roadmap",      title: "Reimbursements",  subtitle: "Expense claims",             icon: "receipt",             color: "#A855F7", gradient: ["#A855F7","#9333EA"] as [string,string], route: "/(modules)/[module]?module=reimbursements",tag: "ESS"      },
+  // Performance
+  { id: "performance",  title: "Performance",     subtitle: "Goals, KPIs & reviews",      icon: "trophy",              color: "#7C3AED", gradient: ["#7C3AED","#6D28D9"] as [string,string], route: "/(modules)/performance",  tag: "Growth", perm: "performance.view" },  // employees get their own via ess.performance
+  // Assets & Inventory
+  { id: "assets",       title: "Assets",          subtitle: "Employee asset tracking",    icon: "cube",                color: "#64748B", gradient: ["#64748B","#475569"] as [string,string], route: "/(modules)/[module]?module=assets",       tag: "Ops", perm: "assets.view" },
+  { id: "inventory",    title: "Inventory",       subtitle: "Stock & adjustments",        icon: "layers",              color: "#059669", gradient: ["#059669","#10B981"] as [string,string], route: "/(modules)/[module]?module=inventory",    tag: "Ops", perm: "inventory.view" },
+  { id: "procurement",  title: "Procurement",     subtitle: "Purchase orders",            icon: "cart",                color: "#D97706", gradient: ["#D97706","#B45309"] as [string,string], route: "/(modules)/[module]?module=procurement",  tag: "Ops", perm: "procurement.view" },
+  { id: "cameras",      title: "Cameras",         subtitle: "Camera device manager",      icon: "videocam",            color: "#1D4ED8", gradient: ["#1D4ED8","#2563EB"] as [string,string], route: "/(modules)/[module]?module=cameras",      tag: "Ops", perm: "camera.view" },  // cameras.ts gates on camera.* (singular)
+=======
   { id: "employees",    title: "Employees",      subtitle: "Directory & profiles",       icon: "people",              color: "#4F46E5", gradient: ["#4F46E5","#6366F1"] as [string,string], route: "/(modules)/employees",    tag: "People"    },
   { id: "onboarding",   title: "Onboarding",     subtitle: "New hire checklist",          icon: "person-add",          color: "#7C3AED", gradient: ["#7C3AED","#8B5CF6"] as [string,string], route: "/(modules)/[module]?module=onboarding",   tag: "People"    },
   { id: "exit",         title: "Exit",            subtitle: "Offboarding & clearance",    icon: "person-remove",       color: "#6B7280", gradient: ["#6B7280","#9CA3AF"] as [string,string], route: "/(modules)/[module]?module=exit",         tag: "People"    },
@@ -54,15 +101,24 @@ const MODULES: Module[] = [
   { id: "inventory",    title: "Inventory",       subtitle: "Stock & adjustments",        icon: "layers",              color: "#059669", gradient: ["#059669","#10B981"] as [string,string], route: "/(modules)/[module]?module=inventory",    tag: "Ops"       },
   { id: "procurement",  title: "Procurement",     subtitle: "Purchase orders",            icon: "cart",                color: "#D97706", gradient: ["#D97706","#B45309"] as [string,string], route: "/(modules)/[module]?module=procurement",  tag: "Ops"       },
   { id: "cameras",      title: "Cameras",         subtitle: "Camera device manager",      icon: "videocam",            color: "#1D4ED8", gradient: ["#1D4ED8","#2563EB"] as [string,string], route: "/(modules)/[module]?module=cameras",      tag: "Ops"       },
+>>>>>>> origin/main
   // Communication
   { id: "communication",title: "Communication",   subtitle: "Announcements & notices",    icon: "megaphone",           color: "#EC4899", gradient: ["#EC4899","#BE185D"] as [string,string], route: "/(modules)/[module]?module=communication",tag: "Comms"     },
   { id: "support",      title: "Support",         subtitle: "Help tickets & chat",        icon: "chatbubbles",         color: "#2563EB", gradient: ["#2563EB","#1D4ED8"] as [string,string], route: "/(modules)/support",      tag: "Comms"     },
   // Reports & Analytics
+<<<<<<< HEAD
+  { id: "reports",      title: "Reports",         subtitle: "HR analytics & exports",     icon: "bar-chart",           color: "#14B8A6", gradient: ["#14B8A6","#0891B2"] as [string,string], route: "/(modules)/reports",      tag: "Reports", perm: "reports.view" },
+  { id: "ai",           title: "AI Assist",       subtitle: "NL queries & anomalies",     icon: "sparkles",            color: "#7C3AED", gradient: ["#7C3AED","#5B21B6"] as [string,string], route: "/(modules)/[module]?module=ai",           tag: "Reports", perm: "ai.view" },
+  // Admin
+  { id: "organization", title: "Organisation",    subtitle: "Departments & structure",    icon: "git-merge",           color: "#0F766E", gradient: ["#0F766E","#0D9488"] as [string,string], route: "/(modules)/[module]?module=organization", tag: "Admin", perm: "organization.view" },
+  { id: "integrations", title: "Integrations",    subtitle: "API keys & webhooks",        icon: "git-branch",          color: "#374151", gradient: ["#374151","#1F2937"] as [string,string], route: "/(modules)/[module]?module=integrations", tag: "Admin", perm: "integrations.view" },
+=======
   { id: "reports",      title: "Reports",         subtitle: "HR analytics & exports",     icon: "bar-chart",           color: "#14B8A6", gradient: ["#14B8A6","#0891B2"] as [string,string], route: "/(modules)/reports",      tag: "Reports"   },
   { id: "ai",           title: "AI Assist",       subtitle: "NL queries & anomalies",     icon: "sparkles",            color: "#7C3AED", gradient: ["#7C3AED","#5B21B6"] as [string,string], route: "/(modules)/[module]?module=ai",           tag: "Reports"   },
   // Admin
   { id: "organization", title: "Organisation",    subtitle: "Departments & structure",    icon: "git-merge",           color: "#0F766E", gradient: ["#0F766E","#0D9488"] as [string,string], route: "/(modules)/[module]?module=organization", tag: "Admin"     },
   { id: "integrations", title: "Integrations",    subtitle: "API keys & webhooks",        icon: "git-branch",          color: "#374151", gradient: ["#374151","#1F2937"] as [string,string], route: "/(modules)/[module]?module=integrations", tag: "Admin"     },
+>>>>>>> origin/main
 ];
 
 const TAGS = ["All", "People", "Time", "Finance", "ESS", "Growth", "Ops", "Comms", "Reports", "Admin"];
@@ -71,8 +127,27 @@ export default function ModulesScreen() {
   const router  = useRouter();
   const [q, setQ] = useState("");
   const [tag, setTag] = useState("All");
+<<<<<<< HEAD
+  const permissions = useAuthStore((s) => s.user?.permissions);
+
+  // T-06 — gate HR-only modules by the caller's REAL auth.me permissions[]
+  // ("module.verb" strings; ROLE_TEMPLATES in types.ts is the default map).
+  // The server enforces every action regardless — this only keeps the hub
+  // honest so employees are not offered HR modules that would only render
+  // denials. Employee-plane modules (no `perm`) are always available.
+  const canUse = (m: Module): boolean => {
+    if (!m.perm) return true;
+    if (!permissions) return true; // permissions not loaded yet — server still enforces
+    return permissions.includes("*") || permissions.includes(m.perm);
+  };
+
+  const visible = MODULES.filter(canUse);
+
+  const filtered = visible.filter(m => {
+=======
 
   const filtered = MODULES.filter(m => {
+>>>>>>> origin/main
     const matchTag = tag === "All" || m.tag === tag;
     const matchQ   = !q || m.title.toLowerCase().includes(q.toLowerCase()) || m.subtitle.toLowerCase().includes(q.toLowerCase());
     return matchTag && matchQ;
@@ -83,7 +158,11 @@ export default function ModulesScreen() {
       {/* Header */}
       <LinearGradient colors={["#0F172A", "#1E293B"]} style={styles.header}>
         <Text style={styles.headerTitle}>All Modules</Text>
+<<<<<<< HEAD
+        <Text style={styles.headerSub}>{visible.length} modules available to you</Text>
+=======
         <Text style={styles.headerSub}>{MODULES.length} modules available</Text>
+>>>>>>> origin/main
         {/* Search */}
         <View style={styles.searchWrap}>
           <Ionicons name="search" size={16} color={Colors.textTertiary} style={{ marginRight: 8 }} />

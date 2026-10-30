@@ -2,17 +2,61 @@
 
 import { useState } from "react";
 import {
+<<<<<<< HEAD
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, Platform, StatusBar, RefreshControl, Alert,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+=======
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Platform, StatusBar, RefreshControl, Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+>>>>>>> origin/main
 import { useFetch } from "@/src/hooks/useFetch";
 import { rpc, ApiError } from "@/src/lib/api";
 import { Card, Badge, Button, EmptyState, SectionHeader, Input } from "@/src/components/ui";
 import { Colors, Spacing, Typography, Radius } from "@/src/theme";
 
 interface Ticket {
+<<<<<<< HEAD
+  // support.tickets contract (routes/support.ts:133) — { rows: [...] }
+  id: string; number: number; subject: string; category: string; status: string; priority: string;
+  assigneeName?: string | null; lastMessageAt?: string | null; createdAt: string; closedAt?: string | null;
+}
+
+// Server enum: LOW | NORMAL | HIGH | URGENT (routes/support.ts:203). There is
+// no "MEDIUM" — the old screen offered it and every such submission failed
+// the .strict() schema.
+const PRIORITIES = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
+
+const CATEGORIES = ["GENERAL", "BILLING", "ATTENDANCE", "PAYROLL", "LEAVE", "EMPLOYEES", "RECRUITMENT", "REPORTS", "SECURITY", "DATA", "INTEGRATION", "OTHER"] as const;
+
+export default function SupportScreen() {
+  const { data, refreshing, refresh } = useFetch<{ rows: Ticket[] }>("support.tickets", { status: "ALL", take: 50 });
+  const tickets = data?.rows ?? [];
+  const [showForm, setShowForm] = useState(false);
+  const [subject, setSubject]   = useState("");
+  const [message, setMessage]   = useState("");
+  const [category, setCategory] = useState<string>("GENERAL");
+  const [priority, setPriority] = useState<string>("NORMAL");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!subject.trim() || message.trim().length < 10) {
+      Alert.alert("Required", "Please fill in the subject and a message of at least 10 characters.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // Server schema (routes/support.ts:200, .strict()): subject 4–160,
+      // category enum, priority enum, message 10–5000. The old call used the
+      // wrong action name, `body` instead of `message`, and a "MEDIUM"
+      // priority that does not exist.
+      await rpc("support.ticket.create", { subject: subject.trim(), category, priority, message: message.trim() });
+      setShowForm(false); setSubject(""); setMessage(""); setCategory("GENERAL"); setPriority("NORMAL");
+=======
   id: string; subject: string; status: string; priority: string;
   createdAt: string; lastMessage?: string;
 }
@@ -34,13 +78,18 @@ export default function SupportScreen() {
     try {
       await rpc("support.createTicket", { subject, body, priority });
       setShowForm(false); setSubject(""); setBody(""); setPriority("MEDIUM");
+>>>>>>> origin/main
       refresh();
     } catch (e) { Alert.alert("Error", e instanceof ApiError ? e.message : "Failed to create ticket"); }
     finally { setSubmitting(false); }
   };
 
   const priorityColor: Record<string, string> = {
+<<<<<<< HEAD
+    LOW: Colors.success, NORMAL: Colors.warning, HIGH: Colors.danger, URGENT: "#7C3AED",
+=======
     LOW: Colors.success, MEDIUM: Colors.warning, HIGH: Colors.danger, URGENT: "#7C3AED",
+>>>>>>> origin/main
   };
 
   return (
@@ -68,6 +117,21 @@ export default function SupportScreen() {
             <Input label="Subject" value={subject} onChangeText={setSubject} placeholder="Brief description of the issue" />
 
             <View>
+<<<<<<< HEAD
+              <Text style={[Typography.label, { marginBottom: 6 }]}>Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {CATEGORIES.map(c => (
+                  <TouchableOpacity key={c} onPress={() => setCategory(c)}
+                    style={[styles.priChip, { borderColor: Colors.border }, category === c && { backgroundColor: Colors.primary, borderColor: Colors.primary }]}>
+                    <Text style={[styles.priChipText, { color: category === c ? "#fff" : Colors.textSecondary }]}>{c}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View>
+=======
+>>>>>>> origin/main
               <Text style={[Typography.label, { marginBottom: 6 }]}>Priority</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {PRIORITIES.map(p => (
@@ -81,11 +145,19 @@ export default function SupportScreen() {
 
             <Input
               label="Message"
+<<<<<<< HEAD
+              value={message}
+              onChangeText={setMessage}
+              multiline
+              numberOfLines={4}
+              placeholder="Describe the issue in detail (at least 10 characters)…"
+=======
               value={body}
               onChangeText={setBody}
               multiline
               numberOfLines={4}
               placeholder="Describe the issue in detail…"
+>>>>>>> origin/main
             />
             <Button label="Submit Ticket" onPress={submit} loading={submitting} variant="primary" fullWidth />
           </Card>
@@ -98,6 +170,17 @@ export default function SupportScreen() {
             <Card key={t.id} style={styles.ticketCard}>
               <View style={styles.ticketTop}>
                 <View style={[styles.priDot, { backgroundColor: priorityColor[t.priority] ?? Colors.info }]} />
+<<<<<<< HEAD
+                <Text style={[Typography.h4, { flex: 1 }]} numberOfLines={1}>#{t.number} · {t.subject}</Text>
+                <Badge label={t.status} />
+              </View>
+              {t.assigneeName ? (
+                <Text style={[Typography.bodyS, { marginTop: 6 }]}>Handled by {t.assigneeName}</Text>
+              ) : null}
+              <View style={styles.ticketFooter}>
+                <Text style={Typography.caption}>
+                  {t.category} · {new Date(t.lastMessageAt ?? t.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+=======
                 <Text style={[Typography.h4, { flex: 1 }]} numberOfLines={1}>{t.subject}</Text>
                 <Badge label={t.status} />
               </View>
@@ -107,6 +190,7 @@ export default function SupportScreen() {
               <View style={styles.ticketFooter}>
                 <Text style={Typography.caption}>
                   {new Date(t.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+>>>>>>> origin/main
                 </Text>
                 <View style={[styles.priLabel, { backgroundColor: (priorityColor[t.priority] ?? Colors.info) + "20" }]}>
                   <Text style={[styles.priLabelText, { color: priorityColor[t.priority] ?? Colors.info }]}>{t.priority}</Text>

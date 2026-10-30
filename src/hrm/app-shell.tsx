@@ -167,6 +167,17 @@ export function AppShell() {
 
   // Header breadcrumb — the active destination resolved against NAV so the
   // user always knows WHERE they are (group + page) without a bloated title.
+<<<<<<< HEAD
+  // T-11 — the manual useMemo here could never be preserved: navGroups
+  // depends on the store's can() selector, which the compiler cannot prove
+  // stable, so the memo recomputed on every render anyway. The lookup is a
+  // trivial ~10-group find — computed directly.
+  let crumb: { group: string; item: { key: string; label: string } } | null = null
+  for (const g of navGroups) {
+    const item = g.items.find((it) => it.key === view.key)
+    if (item) { crumb = { group: g.label, item }; break }
+  }
+=======
   const crumb = useMemo(() => {
     for (const g of navGroups) {
       const item = g.items.find((it) => it.key === view.key)
@@ -174,6 +185,7 @@ export function AppShell() {
     }
     return null
   }, [navGroups, view.key])
+>>>>>>> origin/main
 
   // refresh unread badge periodically — M-15: only while a session is ACTIVE;
   // a logged-out tab must not keep hammering the API (401 noise + load).

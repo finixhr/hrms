@@ -15,7 +15,11 @@
 //     company header + dotted separators + the three-part footer
 //     (Print Date & Time · Powered by Finix HR · Page X of Y). The
 //     openPrintWindow new-tab path is GONE.
+<<<<<<< HEAD
+import { useEffect, useMemo, useState } from "react"
+=======
 import { useEffect, useMemo, useRef, useState } from "react"
+>>>>>>> origin/main
 import {
   FileBarChart, Users, CalendarCheck, Plane, Wallet, Landmark, Receipt, TrendingUp,
   Filter, Check, ChevronsUpDown, Search, ShieldCheck, PlayCircle, Boxes, MapPin, Cake, ArrowLeftRight, PieChart, Hourglass,
@@ -915,6 +919,18 @@ function TemplateDialog({ initial, defaultReportKey, filtersSnapshot, filterSumm
   const [error, setError] = useState<string | null>(null)
 
   // stable per-row ids (index keys would bleed input focus on remove)
+<<<<<<< HEAD
+  // T-11 — ids are derived, not ref-counted: the initializer assigns
+  // index-based ids (evaluated once per mount) and addRecipient derives the
+  // next id from the current rows, so no ref is touched during render.
+  const [recipients, setRecipients] = useState<{ id: number; email: string; name: string }[]>(() => {
+    const rows = (initial?.recipients || []).map((r) => ({ email: r.email || "", name: r.name || "" }))
+    return (rows.length ? rows : [{ email: "", name: "" }]).map((r, i) => ({ ...r, id: i + 1 }))
+  })
+  const addRecipient = () => {
+    if (recipients.length >= 10) return
+    setRecipients((rs) => [...rs, { id: (rs[rs.length - 1]?.id ?? 0) + 1, email: "", name: "" }])
+=======
   const nextRowId = useRef(1)
   const [recipients, setRecipients] = useState<{ id: number; email: string; name: string }[]>(() => {
     const rows = (initial?.recipients || []).map((r) => ({ email: r.email || "", name: r.name || "" }))
@@ -923,6 +939,7 @@ function TemplateDialog({ initial, defaultReportKey, filtersSnapshot, filterSumm
   const addRecipient = () => {
     if (recipients.length >= 10) return
     setRecipients((rs) => [...rs, { id: nextRowId.current++, email: "", name: "" }])
+>>>>>>> origin/main
   }
   const setRecipient = (id: number, field: "email" | "name", value: string) => {
     setRecipients((rs) => rs.map((r) => (r.id === id ? { ...r, [field]: value } : r)))

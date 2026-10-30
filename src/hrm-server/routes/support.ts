@@ -28,7 +28,11 @@ import { audit } from "../audit"
 import { j } from "../utils"
 import { nextTicketNumber } from "../saas/sequences"
 import { TENANT_MODULE_BY_KEY, TENANT_MODULE_KEYS } from "../saas/constants"
+<<<<<<< HEAD
+import { resolveEntitlements } from "../saas/entitlements"
+=======
 import { resolveEntitlements, featureBlocked } from "../saas/entitlements"
+>>>>>>> origin/main
 import { storeUpload, signedObjectUrl } from "../saas/storage"
 import { notifyOwnerUsers } from "../saas/notify"
 import { endSupportSession } from "../saas/support-access"

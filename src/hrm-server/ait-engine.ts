@@ -369,12 +369,26 @@ export function calculateAit(config: AitConfig, input: AitInput): AitCalculation
       // not silently dropped. This fires only when every slab has a finite upperLimit
       // and the sum of limits is less than incomeAboveThreshold.
       if (remaining > 0 && config.slabs.length > 0) {
+<<<<<<< HEAD
+        const lastSlab = [...config.slabs].sort((a, b) => a.order - b.order).at(-1)
+        if (lastSlab) {
+          // unreachable-null guard: at(-1) on a non-empty array always yields
+          // a slab; the wrap keeps the rule honest without an assertion
+          const overflowAmount = remaining // captured BEFORE zeroing — the warning reports it
+          const tax = r0((overflowAmount * lastSlab.ratePercent) / 100)
+          slabLines.push({ slab: `${lastSlab.slabLabel || "Last slab"} (overflow)`, rate: lastSlab.ratePercent, amount: r0(overflowAmount), tax })
+          slabTax += tax
+          remaining = 0
+          warnings.push({ code: "SLAB_OVERFLOW", message: `Income ৳${r0(overflowAmount)} exceeds all configured slab ceilings — taxed at the last slab rate (${lastSlab.ratePercent}%).` })
+        }
+=======
         const lastSlab = [...config.slabs].sort((a, b) => a.order - b.order).at(-1)!
         const tax = r0((remaining * lastSlab.ratePercent) / 100)
         slabLines.push({ slab: `${lastSlab.slabLabel || "Last slab"} (overflow)`, rate: lastSlab.ratePercent, amount: r0(remaining), tax })
         slabTax += tax
         remaining = 0
         warnings.push({ code: "SLAB_OVERFLOW", message: `Income ৳${r0(remaining)} exceeds all configured slab ceilings — taxed at the last slab rate (${lastSlab.ratePercent}%).` })
+>>>>>>> origin/main
       }
     }
   }

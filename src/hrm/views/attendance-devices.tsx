@@ -671,7 +671,16 @@ function SyncHistoryDialog({ device, onOpenChange, onDone }: { device: Dev | nul
 
   // computed without non-null assertions for the lint pass
   const activeUntilMs = device?.historySyncUntil ? new Date(device.historySyncUntil).getTime() : 0
+<<<<<<< HEAD
+  // T-11 — "is active right now" is a time comparison; Date.now() in the
+  // render body is the impurity the purity rule forbids. Captured once per
+  // mount (the dialog re-renders with fresh device data on every reload,
+  // which re-mounts this component anyway).
+  const [nowMs] = useState(() => Date.now())
+  const active = !!device && activeUntilMs > nowMs
+=======
   const active = !!device && activeUntilMs > Date.now()
+>>>>>>> origin/main
   const activeUntilStr = activeUntilMs ? new Date(activeUntilMs).toLocaleString() : ""
 
   const start = async () => {

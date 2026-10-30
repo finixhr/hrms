@@ -355,7 +355,11 @@ export default function CommunicationPage() {
           {/* U1-003 — Campaign delete confirmation dialog */}
           <Dialog open={!!campDeleting} onOpenChange={(v) => { if (!v) setCampDeleting(null) }}>
             <DialogContent className="max-w-md border-white/10 light:border-slate-200 bg-slate-950 light:bg-slate-50">
+<<<<<<< HEAD
+              <DialogHeader><DialogTitle className="text-white light:text-slate-900">Delete campaign &quot;{campDeleting?.name}&quot;?</DialogTitle></DialogHeader>
+=======
               <DialogHeader><DialogTitle className="text-white light:text-slate-900">Delete campaign "{campDeleting?.name}"?</DialogTitle></DialogHeader>
+>>>>>>> origin/main
               <p className="text-sm text-slate-400 light:text-slate-600">
                 This permanently removes the campaign and its full delivery log. This action cannot be undone.
               </p>
@@ -379,7 +383,11 @@ export default function CommunicationPage() {
           {/* U1-004 — Send now confirmation dialog */}
           <Dialog open={!!campSending} onOpenChange={(v) => { if (!v) setCampSending(null) }}>
             <DialogContent className="max-w-md border-white/10 light:border-slate-200 bg-slate-950 light:bg-slate-50">
+<<<<<<< HEAD
+              <DialogHeader><DialogTitle className="text-white light:text-slate-900">Send &quot;{campSending?.name}&quot; now?</DialogTitle></DialogHeader>
+=======
               <DialogHeader><DialogTitle className="text-white light:text-slate-900">Send "{campSending?.name}" now?</DialogTitle></DialogHeader>
+>>>>>>> origin/main
               <p className="text-sm text-slate-400 light:text-slate-600">
                 This will immediately dispatch the campaign to all targeted tenants. This action cannot be undone.
               </p>

@@ -1,9 +1,15 @@
 // Tab navigator — modern bottom tab bar with Ionicons
 
 import { Tabs } from "expo-router";
+<<<<<<< HEAD
+import { View, StyleSheet, Platform } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors } from "@/src/theme";
+=======
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Radius } from "@/src/theme";
+>>>>>>> origin/main
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -42,7 +48,11 @@ export default function TabsLayout() {
           }),
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginTop: 2 },
+<<<<<<< HEAD
+        tabBarIcon: ({ focused, color }) => {
+=======
         tabBarIcon: ({ focused, color, size }) => {
+>>>>>>> origin/main
           const tab = TABS.find(t => t.name === route.name);
           if (!tab) return null;
           return (
