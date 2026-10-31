@@ -344,10 +344,25 @@ and the gate it runs are verified locally and ready.
   stage-identical local gate is green on the M5 tip, and the hosted-green verdict covers `86ef368`
   only until the next push is re-verified.
 
+**M5.1 is complete** (2026-10-31, sixth cycle — local build & device-testing preparation; plus a
+seventh-session handover verification):
+- **Delivered**: the seed crash fix (`040c6b0`), the expo-doctor dependency alignment (`c53c700`),
+  and `docs/engineering/LOCAL_BUILD_AND_DEVICE_TESTING_GUIDE.md` (`4006c5e`) — the owner-facing
+  build/install/test document for Web + Android + Windows Desktop (full record: changelog cycle 6).
+- **Handover verification (seventh session)**: HEAD `4006c5e` confirmed clean = the M5.1 tip;
+  GitHub `main` live-verified at `5b8071d` — **the M5 line IS pushed** (the M5 section's "commits
+  are LOCAL" note above is stale history); the M5.1 triplet is local-only pending a plain
+  fast-forward push from the owner's machine. The pre-built debug APK did not survive the
+  build-environment recycle (never in git — CNG output is gitignored) — rebuild via guide §4.3
+  Path A. One new documented gap: SDK-52 **release** builds carry no `usesCleartextTraffic`
+  (debug-only in the template) — Path-B release APKs over LAN HTTP are blocked until the guide
+  §4.4 `app.json` flag is added (guide §4.4/§9.4 updated; changelog Entry 36).
+
 Recommended next milestone: **M6 = the device-verification pass + TD-27 Android background sync**
 (both are blocked on hardware — one Android + one iOS device unlocks the ENTIRE
 `PRODUCTION_READINESS_CHECKLIST.md` §8 matrix, the TD-26 acceptance, and the TD-27 terminated-app
-acceptance; the wiring spec is ready in `OFFLINE_OUTBOX.md` §11) **+ push the M5 commits**
-(credential needed again after the sandbox recycle — plain fast-forward, no force) **and re-verify
-the hosted run on the M5 SHA with the same API method**. Then T-21/T-22 (UI conformance sweep,
+acceptance; the wiring spec is ready in `OFFLINE_OUTBOX.md` §11) **+ push the M5.1 triplet**
+(`040c6b0`…`4006c5e`, now from the owner's machine — plain fast-forward, no force; the M5 line is
+already on GitHub) **and re-verify the hosted run on the `4006c5e` SHA with the same API
+method**. Then T-21/T-22 (UI conformance sweep,
 desktop shell hardening) and the §5 operations set (T-26…T-29) as the staging-readiness track.

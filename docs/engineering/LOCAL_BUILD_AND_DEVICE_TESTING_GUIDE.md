@@ -21,11 +21,12 @@
 |---|---|---|
 | Web app local stack | **VERIFIED end-to-end** | `bun install` (579 pkgs) → `prisma generate` → `migrate deploy` (48 migrations) → full seed (134,239 rows) → `bun run dev` → login page renders → `auth.login` → forced password rotation → re-login → authenticated `ess.dashboard` RPC returns live data |
 | Unit/regression gates | **VERIFIED** | `scripts/ci.sh` all 14 stages PASS; 1,776/1,778→1,776/1,776 unit tests (158 files, 0 fail); root + mobile `tsc --noEmit` PASS; ESLint 0 errors; `next build` PASS |
-| Android APK | **VERIFIED built** | `expo prebuild` + Gradle `assembleDebug` produced `finix-hr-dev-arm64-debug.apk` (151,081,956 bytes, 1,231 entries). `aapt2 dump badging`: `com.finixhr.app` v1.0.0, compileSdk 35; `apksigner verify` exit 0 (debug cert). One cosmetic ledger task (`createDebugApkListingFileRedirect`) could not complete — sandbox disk exhaustion; the APK itself was fully packaged before it |
+| Android APK | **VERIFIED built** | `expo prebuild` + Gradle `assembleDebug` produced `finix-hr-dev-arm64-debug.apk` (151,081,956 bytes, 1,231 entries). `aapt2 dump badging`: `com.finixhr.app` v1.0.0, compileSdk 35; `apksigner verify` exit 0 (debug cert). One cosmetic ledger task (`createDebugApkListingFileRedirect`) could not complete — sandbox disk exhaustion; the APK itself was fully packaged before it. **Post-cycle (handover verification): that artefact file did NOT survive the build-environment recycle and was never committed (`mobile/android/` is gitignored CNG output) — no copy exists anywhere now. This row records the build verification, not current availability; rebuild locally via §4.3 Path A.** |
 | Mobile config health | **VERIFIED** | `expo-doctor`: **18/18 checks pass** (after aligning `expo-image-manipulator` to `~13.0.6`) |
 | Windows desktop build | **BLOCKED in the build sandbox** (no Rust toolchain / webkit2gtk) — **previously verified on your machine** (2026-10-29): NSIS setup 2.05 MiB, MSI 2.97 MiB, standalone EXE 8.65 MiB, launch verified, signed with thumbprint `250456C96E034A86C2581EC81B1D044347AB71C4` | `docs/RELEASE-STATUS.md` §1/§3 |
 | Physical-device testing | **BLOCKED — not performed** | No Android/iOS device in the build environment. §8 of the readiness checklist remains ALL-BLOCKED until you run §10 below |
 | Hosted URLs `oms.finixhr.com` / `staging-oms.finixhr.com` | **UNVERIFIED** — DNS did not resolve from the build environment | Do not point a local test build at them without checking on your network |
+| Handover verification (7th session — pre-testing audit, 2026-10-31) | **DONE** | HEAD `4006c5e` = the M5.1 tip, clean tree, no dangling objects; GitHub `main` live-checked (`git ls-remote`) at `5b8071d` — the M5 line IS pushed, the M5.1 triplet (`040c6b0`…`4006c5e`) is local-only pending a plain fast-forward push from your machine; seed fix + dependency alignment re-verified in the diffs; NEW documented gap: SDK-52 **release** builds carry no `usesCleartextTraffic` (§4.4) |
 
 One real blocker was found and fixed during preparation (see §11.1): `bun run seed`
 crashed on every fresh database — the `EARNED`→`ANNUAL` leave-type alias had no
@@ -334,24 +335,29 @@ The release APK is signed with your local **debug keystore** (Expo prebuild defa
 `%USERPROFILE%\.android\debug.keystore`, auto-generated). That is fine for private
 testing; it is not a store credential.
 
-### 4.5 Path C — use the APK built during M5.1 (already generated)
+> **⚠ Cleartext trap in release builds (found during handover verification):** the
+> actual Expo SDK 52 build templates were pulled and inspected
+> (`expo-template-bare-minimum@52.0.79`): the **main** `AndroidManifest.xml` sets NO
+> `android:usesCleartextTraffic` — only the **debug** variant manifest
+> (`app/src/debug/AndroidManifest.xml`) sets it to `true`, and nothing in this repo's
+> `mobile/app.json` adds it. Android 9+ (API 28+) therefore blocks every `http://`
+> request a RELEASE build makes — the app reaches the login screen and every API call
+> fails ("Cleartext HTTP traffic not permitted"). Fix, **test builds only**: add
+> `"usesCleartextTraffic": true` under `"android"` in `mobile/app.json`, delete the
+> generated `mobile/android/` if it exists, and rebuild; revert the flag before any
+> store submission. Debug builds (Path A) are unaffected — the debug manifest already
+> allows cleartext.
+
+### 4.5 Path C — the pre-built M5.1 APK: NO LONGER AVAILABLE
 
 `finix-hr-dev-arm64-debug.apk` (151 MB, arm64-v8a only, debug-signed, **no embedded
-JS**) was produced and verified in the build environment. It behaves like a Path-A
-build: it needs Metro running on your PC:
-
-```powershell
-# phone on USB, app installed (see §5), Metro on your PC:
-adb reverse tcp:8081 tcp:8081
-cd mobile
-$env:EXPO_PUBLIC_API_BASE_URL = "http://192.168.1.100:4055"
-npx expo start
-```
-
-Note: it is signed with the *build environment's* debug keystore — your own later
-builds will have a different debug signature, so **uninstall before reinstalling**
-(`adb uninstall com.finixhr.app`) or the install will fail with a signature mismatch.
-arm64-only: it will not install on very old 32-bit phones.
+JS**) was built and verified in the M5.1 build environment (changelog Entry 34), but
+**that environment was recycled and the artefact is gone** — it was never committed
+(`mobile/android/` is gitignored CNG output) and no `.apk` blob exists anywhere in
+git history (verified during the handover audit: the largest blob in the entire
+history is 4.1 MB). Do not hunt for it: **build your own via Path A** — identical
+behaviour (debug-signed, Metro required, LAN API URL set when Metro starts). If it is
+the Metro-free release APK you want, read the §4.4 cleartext trap first.
 
 ### 4.6 Path D — EAS cloud build (optional, needs an EAS account)
 
@@ -385,8 +391,8 @@ adb devices                                  # must list the device
 
 # 1. install (use -r to update an existing install)
 adb install -r mobile\android\app\build\outputs\apk\release\app-release.apk
-# or the M5.1 debug APK:
-adb install -r <path-to>\finix-hr-dev-arm64-debug.apk
+# (Path A installs automatically via `npx expo run:android` — no manual adb needed.
+#  The pre-built M5.1 APK no longer exists — see §4.5.)
 # signature mismatch after switching build machines → adb uninstall com.finixhr.app first
 
 # 2. launch
@@ -574,6 +580,7 @@ adb logcat -c ; adb shell am start -n com.finixhr.app/.MainActivity ; adb logcat
 | `adb install` fails with signature mismatch | APK signed by a different debug keystore | `adb uninstall com.finixhr.app` then install |
 | Phone can't reach `http://<LAN-IP>:4055` | Windows Firewall / wrong adapter IP / subnet isolation | §6 firewall command; verify with the phone's browser |
 | Desktop window shows the offline hub | web dev server not running / URL typo | start `bun run dev`; use the hub's Test button |
+| Release APK: app opens but **every API call fails**; logcat shows `Cleartext HTTP traffic not permitted` | SDK-52 **release** manifests carry no `usesCleartextTraffic` — only the debug variant does (§4.4) | add `"usesCleartextTraffic": true` under `expo.android` in `mobile/app.json`, delete the generated `mobile/android/`, rebuild — test builds only |
 
 ---
 
@@ -698,6 +705,7 @@ That act — not this document — is what flips device verification to real.
 | Physical-device verification (all of §10) | **BLOCKED** | you, a phone, ~2 hours |
 | iOS build/test | **BLOCKED** | a macOS machine + Apple Developer account; no iOS artefact exists yet |
 | EAS cloud builds (path D) | optional | `eas login` with the account owning project `5df89cc1-…`; adjust `eas.json` preview env first |
+| The pre-built M5.1 debug APK (`finix-hr-dev-arm64-debug.apk`) | **ARTEFACT LOST** — the build environment was recycled; it was never in git (CNG output is gitignored) | rebuild locally via §4.3 Path A (~15 min on a first run) |
 | `staging-oms.finixhr.com` / `oms.finixhr.com` reachability | **UNVERIFIED from the build environment** (DNS did not resolve there) | verify from your network before pointing any build at them |
 | Google Play submission | **out of scope / ineligible** | targetSdk 34 vs the 2026 API 35/36 requirement — a future SDK upgrade task (see `docs/RELEASE-STATUS.md` §2.3), NOT this milestone |
 | Desktop rebuild in the M5.1 environment | **BLOCKED there** (no Rust/webkit2gtk on Linux sandbox) | your Windows machine — previously verified (§8) |
@@ -729,4 +737,6 @@ That act — not this document — is what flips device verification to real.
 ---
 
 *Prepared as deliverable M5.1 · 2026-10-31 · changes recorded in
-`docs/engineering/IMPLEMENTATION_CHANGELOG.md`.*
+`docs/engineering/IMPLEMENTATION_CHANGELOG.md`. Handover-verification addendum
+(7th session, same day — Entry 36): cleartext release-build gap, APK artefact loss,
+live push-state verification.*

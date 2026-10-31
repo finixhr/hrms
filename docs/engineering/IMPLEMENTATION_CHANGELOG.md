@@ -77,6 +77,25 @@
 
 ---
 
+## 2026-10-31 — Seventh session (M5.1 handover verification — pre-owner-testing audit)
+
+> Scope: the owner requested one final verification before starting local testing on
+> their own Windows PC + Android phone. Audit + surgical documentation corrections only —
+> no features, no M6, no business-logic changes, no destructive operations.
+
+### Entry 36 · M5.1 handover verification + documentation corrections **[this commit]**
+- **Task**: verify HEAD, commit/push state, the full changed-file set since M5, APK availability, the exact Windows commands, the Android URL chain + cleartext/network-security posture, the desktop commands, and remaining blockers — then correct every place the audit found the documentation wrong or stale.
+- **Files changed**: `docs/engineering/LOCAL_BUILD_AND_DEVICE_TESTING_GUIDE.md` (§0 evidence rows, §4.4 cleartext warning, §4.5 rewrite, §5 install block, §9.4 trap row, §11.2 artefact row, footer), `docs/engineering/MASTER_IMPLEMENTATION_PLAN.md` (M5.1 completion block + next-milestone push note), `docs/engineering/TECHNICAL_DEBT_REGISTER.md` (TD-30 status), this changelog. Companion commit `e6812bb`: `scripts/setup-and-seed.sh` completion banner (stale port-3000 + pre-rewrite `@finixhr.com` accounts → 4055 + the real seeded accounts).
+- **Verified (independently, this session — not from memory)**: HEAD `4006c5e` = the M5.1 tip, clean tree, no stash, no dangling objects (`git fsck`); exactly 3 commits / 5 files since the M5 baseline `5b8071d` — seed fix `040c6b0`, dependency alignment `c53c700`, docs `4006c5e` — both code changes re-checked line-by-line in the diffs; GitHub `main` live-verified (`git ls-remote https://github.com/finixhr/hrms.git`) at `5b8071d` — **the M5 line IS pushed** (the M5 section's "commits are LOCAL" note is stale), the M5.1 triplet is local-only pending a plain fast-forward push, now from the owner's machine; the pre-built APK exists **nowhere** — not in the sandbox, not in the delivery folder, not in git history (largest blob in the entire history is 4.1 MB; no `.apk` ever tracked).
+- **NEW finding — cleartext release-build gap**: pulled and inspected the actual SDK-52 build templates from npm (`expo-template-bare-minimum@52.0.79` + `@expo/config-plugins@9.0.17`): the **main** manifest template sets NO `android:usesCleartextTraffic`; only the debug variant (`app/src/debug/AndroidManifest.xml`) sets `true`; `mobile/app.json` adds nothing. Consequence: debug builds over LAN HTTP work, but the guide's §4.4 release-APK path would have failed at first login on Android 9+ ("Cleartext HTTP traffic not permitted") — the guide had **zero cleartext coverage**. Now documented with the `app.json` fix (test builds only) in §4.4 + §9.4.
+- **Functionality**: documentation accuracy for the owner's first test session; no runtime code changed anywhere.
+- **DB changes**: none.
+- **Tests executed**: `bash -n scripts/setup-and-seed.sh` (syntax clean); `bash scripts/check-docs.sh` (every markdown-referenced path/script exists — green with the new text); bundle round-trip on the shipped artefact (clone-from-bundle → HEAD matches, `git fsck` clean). Full unit/type gates intentionally not re-run — the diff is documentation + one bash echo block; no executable behaviour touched.
+- **Remaining limitations**: device verification remains the owner's act (nothing claims VERIFIED-ON-DEVICE); the hosted-CI green verdict still covers `86ef368` only until the M5.1 push is re-verified.
+- **Next task**: the owner's local test pass (guide §10, ~2 hours) → M6 planning with the results.
+
+---
+
 ## 2026-10-31 — Fifth implementation cycle (M5: hosted-CI verification + T-18…T-20 + TD-27 investigation)
 
 ### Entry 23 · Baseline recovery + hosted-CI run verification (Phase 1) **[no commit — verification only]**
