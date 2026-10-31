@@ -615,10 +615,16 @@ This NOC is issued on {{date}} at the employee's request.`],
       data: { vendorId: finix.id, employeeId: emp.id, category: "EDUCATION", docType: "CERTIFICATE", title: "BBA Certificate", nameOnDoc: s.name, issueDate: dstr(2014, 6, 30), issuingAuthority: "University of Dhaka", status: "VALID", verified: Math.random() > 0.3 },
     })
     // leave balances
-    for (const [ltCode, ltId] of Object.entries(leaveTypes)) {
+    // M5.1 fix (local-build blocker): iterate ltDefs — the REAL types — not
+    // Object.entries(leaveTypes): the map carries the EARNED→ANNUAL alias
+    // (LVE-113) which has NO ltDefs row (the old `find(...)![3]` dereferenced
+    // undefined and crashed `bun run seed`), and whose leaveTypeId IS ANNUAL's,
+    // so a second balance row would violate @@unique([employeeId, leaveTypeId,
+    // year]) anyway. The alias stays for the fixtures below that reference
+    // leaveTypes["EARNED"] — they resolve to ANNUAL's id and its balance row.
+    for (const [ltCode, , , entitledDays] of ltDefs) {
       await db.leaveBalance.create({
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- audited TODO(H-20 paydown): convert to an explicit null check
-        data: { vendorId: finix.id, employeeId: emp.id, leaveTypeId: ltId, year: YEAR, entitled: ltDefs.find((x) => x[0] === ltCode)![3], used: 0, pending: 0, carriedForward: ["ANNUAL", "EARNED"].includes(ltCode) ? 2 : 0 },
+        data: { vendorId: finix.id, employeeId: emp.id, leaveTypeId: leaveTypes[ltCode], year: YEAR, entitled: entitledDays, used: 0, pending: 0, carriedForward: ["ANNUAL", "EARNED"].includes(ltCode) ? 2 : 0 },
       })
     }
   }
