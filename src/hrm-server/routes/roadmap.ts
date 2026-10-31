@@ -4,7 +4,7 @@
 // commission rule engine, shift auto-roster, payroll reversal register,
 // audit-retention cleanup, backup export and employee bulk import.
 import { db } from "@/lib/db"
-import { route } from "./registry"
+import { route, alias } from "./registry"
 import {Deny, employeeScopeFilter} from "../rbac"
 import { audit, notify } from "../audit"
 import { getSettings } from "../settings"
@@ -1442,3 +1442,44 @@ route("employees.bulkImport", {
     }
   },
 })
+
+// ---------------------------------------------------------------------------
+// T-20 (2026-10-31) — prefixed aliases for this module's flat registrations.
+// Root cause (API_CONTRACT_AUDIT.md §5.1): taxExemptions.*/salaryTemplates.*/
+// overtime.*/reimbursements.*/orgChart.*/promotions.list/transfers.list/
+// salaryRevisions.list/exitPacket.generate/auditRetention.purge/
+// backups.export carry no module prefix, unlike every other route family.
+// Each alias uses the feature module its canonical route already gates by
+// (the perm's first segment), so dispatcher behavior is identical by
+// construction. Three roadmap registrations are ALREADY module-prefixed and
+// are deliberately NOT re-aliased: shifts.autoRoster, payroll.reversals,
+// employees.bulkImport. The flat names stay CANONICAL (the web SPA's live
+// call sites — inventory in the audit doc); these aliases serve new
+// consumers that expect the prefixed spelling.
+// ---------------------------------------------------------------------------
+alias("ait.taxExemptions.list", "taxExemptions.list")
+alias("ait.taxExemptions.save", "taxExemptions.save")
+alias("ait.taxExemptions.delete", "taxExemptions.delete")
+alias("payroll.salaryTemplates.list", "salaryTemplates.list")
+alias("payroll.salaryTemplates.save", "salaryTemplates.save")
+alias("payroll.salaryTemplates.delete", "salaryTemplates.delete")
+alias("payroll.salaryTemplates.apply", "salaryTemplates.apply")
+alias("payroll.salaryRevisions.list", "salaryRevisions.list")
+alias("attendance.overtime.list", "overtime.list")
+alias("attendance.overtime.submit", "overtime.submit")
+alias("expenses.reimbursements.list", "reimbursements.list")
+alias("expenses.reimbursements.mark", "reimbursements.mark")
+alias("employees.orgChart.data", "orgChart.data")
+alias("employees.orgChart.organogram", "orgChart.organogram")
+alias("employees.orgChart.saveLayout", "orgChart.saveLayout")
+alias("employees.orgChart.batchSetReporting", "orgChart.batchSetReporting")
+alias("employees.orgChart.setReportingManager", "orgChart.setReportingManager")
+alias("employees.orgChart.reassignEmployee", "orgChart.reassignEmployee")
+alias("employees.orgChart.assignDesignationDepartment", "orgChart.assignDesignationDepartment")
+alias("employees.orgChart.desigChart.data", "orgChart.desigChart.data")
+alias("employees.orgChart.desigChart.saveHierarchy", "orgChart.desigChart.saveHierarchy")
+alias("employees.promotions.list", "promotions.list")
+alias("employees.transfers.list", "transfers.list")
+alias("letters.exitPacket.generate", "exitPacket.generate")
+alias("settings.auditRetention.purge", "auditRetention.purge")
+alias("settings.backups.export", "backups.export")

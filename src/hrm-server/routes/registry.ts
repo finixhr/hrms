@@ -36,10 +36,39 @@ export type RouteDef = {
 
 export const routes: Record<string, RouteDef> = {}
 
+// T-20 (2026-10-31) — alias → canonical map. Every entry is a DEPRECATED
+// flat name's prefixed twin (see API_CONTRACT_AUDIT.md §5.1): the canonical
+// registration stays the flat name (the web SPA's live call sites), the
+// alias gives new consumers the module-prefixed spelling that matches every
+// other route family (`attendance.*`, `leaveRequests.*`, …). Aliases share
+// the canonical's RouteDef OBJECT — same handler, perm, schema and lockout
+// classification — so the two spellings can never drift apart.
+export const routeAliases: Record<string, string> = {}
+
 export function route(action: string, def: RouteDef) {
   routes[action] = def
 }
 
+/** Register `action` as a prefixed alias of the already-registered
+ * `target` (e.g. alias("performance.reviews.list", "reviews.list")).
+ * Loud failures: an unknown target or a colliding action name throws at
+ * module-load time — a broken alias must never boot silently. */
+export function alias(action: string, target: string) {
+  const def = routes[target]
+  if (!def) throw new Error(`[registry] alias target not registered: "${target}" (for alias "${action}")`)
+  if (Object.prototype.hasOwnProperty.call(routes, action) && routes[action] !== def) {
+    throw new Error(`[registry] alias collision: "${action}" is already registered with a different definition`)
+  }
+  routes[action] = def
+  routeAliases[action] = target
+}
+
 export function getRoute(action: string): RouteDef | undefined {
   return routes[action]
+}
+
+/** True when `action` is a deprecated-alias spelling (the flat canonical
+ * name keeps working — removal would need its own coordinated migration). */
+export function isRouteAlias(action: string): boolean {
+  return Object.prototype.hasOwnProperty.call(routeAliases, action)
 }

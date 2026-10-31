@@ -1,6 +1,6 @@
 // ============ Performance / KPI / Task routes (spec §11) ============
 import { db } from "@/lib/db"
-import { route } from "./registry"
+import { route, alias } from "./registry"
 import { Deny, employeeScopeFilter, assertEmployeeVisible } from "../rbac"
 import { audit, notify } from "../audit"
 import { notifyChannels } from "../delivery"
@@ -481,3 +481,31 @@ route("tasks.delete", {
     return { deleted: true }
   },
 })
+
+// ---------------------------------------------------------------------------
+// T-20 (2026-10-31) — prefixed aliases for this module's flat registrations.
+// Root cause (API_CONTRACT_AUDIT.md §5.1): cycles.*/reviews.*/kpiTemplates.*/
+// kpiAssignments.*/tasks.* carry no module prefix, unlike every other route
+// family — the inconsistency that seeded the mobile app's imagined
+// `performance.*` namespace. The flat names stay CANONICAL (the web SPA's
+// live call sites — see the inventory in the audit doc); these aliases give
+// new consumers the prefixed spelling. `ess.reviewSelf` is already
+// correctly prefixed and is NOT aliased. Aliases share the canonical
+// RouteDef object — same perm/schema/handler — by construction.
+// ---------------------------------------------------------------------------
+alias("performance.cycles.list", "cycles.list")
+alias("performance.cycles.save", "cycles.save")
+alias("performance.reviews.list", "reviews.list")
+alias("performance.reviews.save", "reviews.save")
+alias("performance.reviews.acknowledge", "reviews.acknowledge")
+alias("performance.reviews.finalize", "reviews.finalize")
+alias("performance.kpiTemplates.list", "kpiTemplates.list")
+alias("performance.kpiTemplates.save", "kpiTemplates.save")
+alias("performance.kpiTemplates.delete", "kpiTemplates.delete")
+alias("performance.kpiAssignments.list", "kpiAssignments.list")
+alias("performance.kpiAssignments.assign", "kpiAssignments.assign")
+alias("performance.kpiAssignments.submitResults", "kpiAssignments.submitResults")
+alias("performance.tasks.list", "tasks.list")
+alias("performance.tasks.save", "tasks.save")
+alias("performance.tasks.comment", "tasks.comment")
+alias("performance.tasks.delete", "tasks.delete")

@@ -36,8 +36,9 @@ route("ess.profile", {
     // is the employee's OWN data surface, so the values decrypt (legacy
     // plaintext rows pass through readPiiText untouched).
     // T-18 audit — own bank accounts capped (was unbounded; realistically 1–3,
-    // the cap is belt-and-braces against a runaway writer)
-    const banks = (await db.bankAccount.findMany({ where: { employeeId: id }, orderBy: { createdAt: "desc" }, take: 20 })).map((b: any) => ({
+    // the cap is belt-and-braces against a runaway writer). The model has no
+    // timestamp — order by primary-first (the card shows the primary account).
+    const banks = (await db.bankAccount.findMany({ where: { employeeId: id }, orderBy: { isPrimary: "desc" }, take: 20 })).map((b: any) => ({
       ...b,
       accountNumber: readPiiText(b.accountNumber),
       mfsNumber: readPiiText(b.mfsNumber),
