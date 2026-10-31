@@ -194,7 +194,15 @@ describe("ATT-006 — branch-specific holiday only suppresses that branch's abse
     // the sweep's notification is the observable: run the exported job
     const { sweepAttendanceAlerts } = await import("@/hrm-server/jobs")
     const { getSettings } = await import("@/hrm-server/settings")
-    await (sweepAttendanceAlerts as any)(vendor.id, appToday6(), await getSettings(vendor.id))
+    // De-flake (M5, 2026-10-31): DEFAULT_SETTINGS.general.weeklyHoliday is
+    // ["FRIDAY"] (BD convention) — when "yesterday" lands on the weekly off
+    // the sweep skips EVERYONE and this test fails for calendar reasons only
+    // (reproduced on Sat 2026-10-31; identical failure at the pre-M5 baseline
+    // 86ef368, and hosted CI passed on Fri only because Thursday preceded it).
+    // Neutralize the weekly-off so the BRANCH-HOLIDAY logic is what's tested.
+    const st = await getSettings(vendor.id)
+    const hermetic = { ...st, general: { ...st.general, weeklyHoliday: [] as string[] } }
+    await (sweepAttendanceAlerts as any)(vendor.id, appToday6(), hermetic)
     const notes = await db.notification.findMany({
       where: { vendorId: vendor.id, title: "Attendance Alert", createdAt: { gte: new Date(Date.now() - 60000) } },
       orderBy: { createdAt: "desc" },

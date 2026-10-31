@@ -97,15 +97,21 @@ describe("SCL-14 materializeAbsentDay — createMany + slim selects", () => {
     const e2 = await db.employee.create({ data: { vendorId: v.id, code: uniq("E2"), fullName: "B", joiningDate: iso(300) } })
     // e2 already has an attendance row → not materialized
     await db.attendance.create({ data: { vendorId: v.id, employeeId: e2.id, date: yesterday, status: "PRESENT" } })
-    const settings = await getSettings(v.id)
-    const n = await materializeAbsentDay(v.id, yesterday, settings)
+    // De-flake (M5, 2026-10-31): the default weekly holiday is FRIDAY (BD
+    // convention) — when `yesterday` (a RELATIVE date) lands on it the sweep
+    // skips everyone and the count assertions fail for calendar reasons only
+    // (reproduced on Sat 2026-10-31; identical failure at the pre-M5 baseline
+    // 86ef368). Neutralize the weekly-off so MATERIALIZATION is what's tested.
+    const st = await getSettings(v.id)
+    const hermetic = { ...st, general: { ...st.general, weeklyHoliday: [] as string[] } }
+    const n = await materializeAbsentDay(v.id, yesterday, hermetic)
     expect(n).toBe(1)
     const rows = await db.attendance.findMany({ where: { vendorId: v.id, date: yesterday } })
     expect(rows.length).toBe(2)
     const absentRow = rows.find((r) => r.employeeId === e1.id)
     expect(absentRow?.status).toBe("ABSENT")
     // second run: e1 now has a row → 0 materialized (idempotent)
-    const again = await materializeAbsentDay(v.id, yesterday, settings)
+    const again = await materializeAbsentDay(v.id, yesterday, hermetic)
     expect(again).toBe(0)
     const rows2 = await db.attendance.findMany({ where: { vendorId: v.id, date: yesterday } })
     expect(rows2.length).toBe(2)
@@ -115,8 +121,12 @@ describe("SCL-14 materializeAbsentDay — createMany + slim selects", () => {
     const v = await db.vendor.create({ data: { name: "scl14b", code: uniq("scl14b") } })
     const yesterday = iso(1)
     await db.employee.create({ data: { vendorId: v.id, code: uniq("J"), fullName: "New Joiner", joiningDate: iso(0) } })
-    const settings = await getSettings(v.id)
-    const n = await materializeAbsentDay(v.id, yesterday, settings)
+    // De-flake (M5, 2026-10-31): same weekly-off neutralization as above —
+    // on a weekly-off "yesterday" this test passed only by accident (0 rows
+    // because of the calendar, not the joining guard). Deterministic now.
+    const st = await getSettings(v.id)
+    const hermetic = { ...st, general: { ...st.general, weeklyHoliday: [] as string[] } }
+    const n = await materializeAbsentDay(v.id, yesterday, hermetic)
     expect(n).toBe(0)
   })
 })
