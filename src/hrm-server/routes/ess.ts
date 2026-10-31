@@ -25,7 +25,9 @@ route("ess.profile", {
       emp.departmentId ? db.department.findFirst({ where: { id: emp.departmentId } }) : null,
       emp.designationId ? db.designation.findFirst({ where: { id: emp.designationId } }) : null,
       db.salaryStructure.findFirst({ where: { employeeId: id, status: "ACTIVE" } }),
-      db.employeeDocument.findMany({ where: { vendorId: ctx.vendorId, employeeId: id } }),
+      // T-18 audit — documents capped (was unbounded; an employee accumulates
+      // one row per uploaded document over their whole tenure)
+      db.employeeDocument.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" }, take: 100 }),
       db.employeeHistory.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" }, take: 30 }),
       emp.reportingManagerId ? db.employee.findFirst({ where: { id: emp.reportingManagerId }, select: { fullName: true, mobile: true } }) : null,
     ])
@@ -33,7 +35,9 @@ route("ess.profile", {
     // F28 (P6) — account/MFS numbers are encrypted at rest; the ESS profile
     // is the employee's OWN data surface, so the values decrypt (legacy
     // plaintext rows pass through readPiiText untouched).
-    const banks = (await db.bankAccount.findMany({ where: { employeeId: id } })).map((b: any) => ({
+    // T-18 audit — own bank accounts capped (was unbounded; realistically 1–3,
+    // the cap is belt-and-braces against a runaway writer)
+    const banks = (await db.bankAccount.findMany({ where: { employeeId: id }, orderBy: { createdAt: "desc" }, take: 20 })).map((b: any) => ({
       ...b,
       accountNumber: readPiiText(b.accountNumber),
       mfsNumber: readPiiText(b.mfsNumber),
@@ -79,15 +83,41 @@ route("ess.attendance", {
 
   // INTENTIONALLY_SELF_SCOPED (M-02): ESS self-service: only the caller's own leave requests/balances
 route("ess.leave", {
-  handler: async (ctx) => {
+  handler: async (ctx, p) => {
     const id = requireSelf(ctx)
     const year = new Date().getFullYear()
     const balances = await db.leaveBalance.findMany({ where: { employeeId: id, year } })
-    const types = await db.leaveType.findMany({ where: { vendorId: ctx.vendorId, active: true } })
-    const requests = await db.leaveRequest.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" } })
+    // T-18 audit — the tenant's active leave-type catalog capped at 100 (the
+    // apply form's type picker; realistic tenants carry < 15)
+    const types = await db.leaveType.findMany({ where: { vendorId: ctx.vendorId, active: true }, orderBy: { name: "asc" }, take: 100 })
+    // T-18 (2026-10-31) — the request history was UNBOUNDED (every leave
+    // request the employee ever filed, newest first, no cap). Long-tenure
+    // employees with frequent absences made this the one remaining unbounded
+    // ESS read after ESS-07 capped the siblings at 200. Now capped at the
+    // 200 most recent requests (same bound as ess.expenses/ess.tasks), with
+    // an OPTIONAL month filter on the leave START date (fromDate prefix,
+    // mirroring ess.attendance's month/year params) so a future consumer can
+    // page through history without loading it all at once. Balances are
+    // year-scoped (≤ #leave types) and types are the tenant's active list —
+    // both naturally bounded.
+    const month = p?.month ? String(Number(p.month)).padStart(2, "0") : null
+    const filterYear = p?.year ? String(Number(p.year)) : null
+    const prefix = month && filterYear ? `${filterYear}-${month}` : null
+    const requests = await db.leaveRequest.findMany({
+      where: {
+        vendorId: ctx.vendorId, employeeId: id,
+        ...(prefix ? { fromDate: { startsWith: prefix } } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    })
+    // Substitute queue: PENDING-only by design, but still capped — an
+    // adversarial tenant could otherwise name one employee as substitute on
+    // thousands of rows and blow up THEIR payload.
     const substitutes = await db.leaveRequest.findMany({
       where: { vendorId: ctx.vendorId, substituteEmployeeId: id, substituteStatus: "PENDING" },
       orderBy: { createdAt: "desc" },
+      take: 200,
     })
     return {
       balances: balances.map((b) => ({
@@ -184,9 +214,11 @@ route("ess.colleagues", {
         orderBy: { fullName: "asc" },
         take: 1000,
       }),
-      db.designation.findMany({ where: { vendorId: ctx.vendorId }, select: { id: true, name: true } }),
-      db.department.findMany({ where: { vendorId: ctx.vendorId }, select: { id: true, name: true } }),
-      db.branch.findMany({ where: { vendorId: ctx.vendorId }, select: { id: true, name: true } }),
+      // T-18 audit — org catalogs capped (name decoration for the bounded
+      // employee list; graceful degradation if a tenant exceeds the cap)
+      db.designation.findMany({ where: { vendorId: ctx.vendorId }, select: { id: true, name: true }, orderBy: { name: "asc" }, take: 200 }),
+      db.department.findMany({ where: { vendorId: ctx.vendorId }, select: { id: true, name: true }, orderBy: { name: "asc" }, take: 200 }),
+      db.branch.findMany({ where: { vendorId: ctx.vendorId }, select: { id: true, name: true }, orderBy: { name: "asc" }, take: 200 }),
     ])
     return list.map((e) => ({
       id: e.id, fullName: e.fullName, code: e.code,
@@ -203,12 +235,18 @@ route("ess.loans", {
   perm: ["ess", "view"],
   handler: async (ctx) => {
     const id = requireSelf(ctx)
-    const loans = await db.loan.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" } })
-    const advances = await db.advance.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" } })
+    // T-18 audit — every list read here is capped (was unbounded): own
+    // loans/advances at the 100 most recent; the PENDING guarantee queue
+    // at 100 (an adversarial tenant can otherwise name anyone guarantor on
+    // thousands of rows). Installments are fetched only for the returned
+    // loans (bounded transitively).
+    const loans = await db.loan.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" }, take: 100 })
+    const advances = await db.advance.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" }, take: 100 })
     // Loans where I am the named guarantor and my consent is still pending
     const guarantees = await db.loan.findMany({
       where: { vendorId: ctx.vendorId, guarantorId: id, guarantorStatus: "PENDING" },
       orderBy: { createdAt: "desc" },
+      take: 100,
     })
     // ESS-07 (R6) — own-scope decoration: the caller's + guarantor names and
     // the guarantee requesters only (was: the FULL tenant directory), and the
@@ -273,9 +311,12 @@ route("ess.performance", {
     // see. ESS-05 (R7) widened the set from FINAL-only: the employee now
     // sees the SUBMITTED review so they can acknowledge it (and their
     // ACKNOWLEDGED review while it awaits finalization).
-    const reviews = await db.performanceReview.findMany({ where: { vendorId: ctx.vendorId, employeeId: id, status: { in: ["SUBMITTED", "ACKNOWLEDGED", "FINAL"] } } })
-    const kpis = await db.kpiAssignment.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" } })
-    const cycles = await db.reviewCycle.findMany({ where: { vendorId: ctx.vendorId } })
+    const reviews = await db.performanceReview.findMany({ where: { vendorId: ctx.vendorId, employeeId: id, status: { in: ["SUBMITTED", "ACKNOWLEDGED", "FINAL"] } }, orderBy: { createdAt: "desc" }, take: 100 })
+    // T-18 audit — reviews/kpis capped at the 100 most recent (was
+    // unbounded); cycles is the tenant's cycle catalog used only to decorate
+    // the returned rows — capped at 100 in step.
+    const kpis = await db.kpiAssignment.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" }, take: 100 })
+    const cycles = await db.reviewCycle.findMany({ where: { vendorId: ctx.vendorId }, orderBy: { createdAt: "desc" }, take: 100 })
     return {
       reviews: reviews.map((r) => ({ ...r, ratings: j(r.ratingsJson, {}), inputs: j((r as any).inputsJson, {}), cycleName: cycles.find((c) => c.id === r.cycleId)?.name })),
       kpis: kpis.map((k) => ({ ...k, results: j(k.resultsJson, []) })),
@@ -287,10 +328,13 @@ route("ess.performance", {
 route("ess.documents", {
   handler: async (ctx) => {
     const id = requireSelf(ctx)
-    const docs = await db.employeeDocument.findMany({ where: { vendorId: ctx.vendorId, employeeId: id } })
+    // T-18 audit — documents/letters capped at the 100 most recent (was
+    // unbounded; both accumulate over an employee's whole tenure)
+    const docs = await db.employeeDocument.findMany({ where: { vendorId: ctx.vendorId, employeeId: id }, orderBy: { createdAt: "desc" }, take: 100 })
     const letters = await db.hrLetter.findMany({
       where: { vendorId: ctx.vendorId, employeeId: id, status: "ISSUED" },
       orderBy: { issuedAt: "desc" },
+      take: 100,
     })
     return {
       docs: docs.map((d) => ({ id: d.id, docType: d.docType, title: d.title, status: d.status, verified: d.verified, expiryDate: d.expiryDate })),
@@ -481,9 +525,12 @@ route("ess.profile.update", {
 route("ess.myAssets", {
   handler: async (ctx) => {
     const id = requireSelf(ctx)
+    // T-18 audit — assignment history capped at the 200 most recent (was
+    // unbounded; every issue/return pair over the employee's tenure)
     const assignments = await db.assetAssignment.findMany({
       where: { vendorId: ctx.vendorId, employeeId: id },
       orderBy: { assignedAt: "desc" },
+      take: 200,
     })
     const assetIds = [...new Set(assignments.map((a) => a.assetId))]
     const assets = assetIds.length
