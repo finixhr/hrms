@@ -56,18 +56,23 @@ echo "  ✅ Setup complete"
 echo "════════════════════════════════════════════════════════════════"
 echo
 echo "  Start the dev server:"
-echo "    bun run dev"
+echo "    bun run dev            # binds 0.0.0.0:4055"
 echo
-echo "  Then open http://localhost:3000 and log in with any of:"
-echo "    owner@finixhr.com     (Vendor Owner — full access)"
-echo "    admin@finixhr.com     (HR Admin)"
-echo "    hr@finixhr.com        (HR Manager)"
-echo "    payroll@finixhr.com   (Payroll Officer)"
-echo "    branch@finixhr.com    (Branch Manager — Dhanmondi)"
-echo "    employee@finixhr.com  (ESS portal)"
-echo "    owner@rongintraders.com (Tenant #2 — isolation demo)"
+# M5.1 handover-verification fix: this banner predated the seed rewrite — it
+# advertised port 3000 and the old @finixhr.com accounts. The dev server binds
+# 0.0.0.0:4055 (package.json "dev"), and the real seeded accounts live at
+# @bengaltextworks.example (seed.ts userDefs) + the SaaS owner console.
+echo "  Then open http://localhost:4055 and log in with any of:"
+echo "    owner@bengaltextworks.example       (Vendor Owner — full access)"
+echo "    admin@bengaltextworks.example       (HR Admin)"
+echo "    hr@bengaltextworks.example          (HR Manager)"
+echo "    payroll@bengaltextworks.example     (Payroll Officer)"
+echo "    branch@bengaltextworks.example      (Branch Manager)"
+echo "    employee@bengaltextworks.example    (ESS — the phone-testing account)"
+echo "    owner@rongintraders.com             (Tenant #2 — isolation demo)"
+echo "    owner@finixhr.local / SaasOwner@2026   (SaaS Owner Console — /owner/login)"
 echo
-echo "  Password for all accounts: Pass@123"
+echo "  Password for all accounts: Pass@123 (first login forces a password rotation — by design)"
 echo
 echo "  Smoke-test the ZKTeco Push SDK protocol:"
 echo "    bun run test:zkteco"
