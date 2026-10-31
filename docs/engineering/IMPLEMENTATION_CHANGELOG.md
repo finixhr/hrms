@@ -5,6 +5,78 @@
 
 ---
 
+## 2026-10-31 — Sixth implementation cycle (M5.1: local build & device-testing preparation)
+
+> Scope discipline: preparation + validation only — no M6 features. Two confirmed
+> build/configuration blockers fixed; everything else is verification, documentation
+> and one generated APK artefact.
+
+### Entry 30 · M5.1 baseline recovery + repository/environment audit (Phase 1) **[no commit — verification only]**
+- **Baseline**: restored from the user's `finix-hr-main-20261031-session5.bundle` (verified complete history, HEAD `5b8071d` — the M5 documentation commit, 23 commits, clean working tree, 0 modified files). The stale pre-M3 tree found at `source/finix-hr` (corrupted `.git`, HEAD unresolvable) was replaced, not merged.
+- **Audit findings recorded for the guide**: Bun 1.4.2 pin is load-bearing (sandbox's stock 1.3.14 cannot parse `bun.lock` — `UnknownLockfileVersion`, reproduced); the boot-time env guard refuses unknown `HRM_*`/`ZKTECO_*`/`ADMS_*` names; the seed's SaaS layer rides the main `bun run seed` (owner console `owner@finixhr.local` / dev default `SaasOwner@2026`); mobile URL chain is `EXPO_PUBLIC_API_BASE_URL` → `app.json extra.apiBaseUrl` (**production `https://oms.finixhr.com`**) → `localhost:4055`, so local builds MUST set the env var explicitly; EAS `preview` profile bakes `staging-oms.finixhr.com` (host did NOT resolve from the build environment); desktop config is the post-`591a82e` local-hub design (`frontendDist: "../ui"`, runtime-configurable server URL) — `docs/MULTI-PLATFORM.md` §3 still documents the pre-hub config (flagged as stale, deliberately not rewritten in this cycle).
+- **Tests executed**: full gate on the untouched baseline — `scripts/ci.sh` (E2E_SKIP=1) exit 0 (14 stages, 1,776/1,776 unit), root + mobile `tsc` 0, ESLint 0 errors (12/10 advisory warnings), `next build` exit 0, expo-doctor 17/18 (the one advisory → Entry 32).
+- **Next task**: Entry 31.
+
+### Entry 31 · Fix `bun run seed` crash — the EARNED leave-type alias has no `ltDefs` row **[commit `fix(seed)`]**
+- **Task**: the first real blocker of the M5.1 directive — "the web app must actually run locally".
+- **Files changed**: `src/hrm-server/seed.ts` (leave-balance loop, +9/−3).
+- **Functionality**: the loop iterated `Object.entries(leaveTypes)` — a map that carries the LVE-113 `EARNED → ANNUAL` alias — and dereferenced `ltDefs.find(x => x[0] === ltCode)![3]`, which is `undefined` for the alias → `TypeError`, seed aborts mid-employee-loop. Broken since the baseline commit (the alias row never existed in `ltDefs` in any commit; CI never saw it because the unit lane never runs the dev seed). It now iterates `ltDefs` (the 7 real types) using the destructured `entitledDays`; the alias stays for the later fixtures that reference `leaveTypes["EARNED"]` (they resolve to ANNUAL's id). Behaviour-identical for every real type — and a second balance row for the alias would have violated `@@unique([employeeId, leaveTypeId, year])` anyway (same leaveTypeId as ANNUAL).
+- **DB changes**: none (seed script only; no schema/migration change).
+- **Tests executed**: full `bun run seed` to completion on a fresh `hrm_dev` — 134,239 rows across 45 tables; `bun run seed:verify` exit 0 (one date-dependent fixture quirk documented in the guide §11.3: the October payroll run legitimately recovers one of the two loan-arrears installments); `scripts/seed-new-modules.ts`, `scripts/migrate-role-perms.ts`, `scripts/seed-approval-workflows.ts` all exit 0.
+- **Remaining limitations**: no automated test pins the dev seed (dev-only tooling; e2e lane boots the real app without it) — the honest guard is this entry + the guide's re-run instructions.
+- **Next task**: Entry 32.
+
+### Entry 32 · Align `expo-image-manipulator` to the SDK-52-expected version **[commit `chore(mobile)`]**
+- **Task**: the single expo-doctor advisory found in the baseline audit (TD-30 family).
+- **Files changed**: `mobile/package.json` (`~13.0.3` → `~13.0.6`), `mobile/package-lock.json`.
+- **Functionality**: patch-level alignment inside Expo SDK 52 — exactly what `expo-doctor` prescribes (`npx expo install expo-image-manipulator`). Selfie-resize behaviour unchanged (the module is used for the ≤640px selfie downscale).
+- **DB changes**: none.
+- **Tests executed**: `npx expo-doctor` → **18/18 checks pass** (was 17/18); mobile `tsc --noEmit` 0; mobile ESLint 0 errors; `npm ci` lockfile-exact.
+- **Remaining limitations**: none.
+- **Next task**: Entry 33.
+
+### Entry 33 · Web local-execution verification (end-to-end, against the real server) **[no commit — verification only]**
+- **Verified chain** (PostgreSQL 17.11 local, dev `.env` with a freshly generated `HRM_MFA_KEY`): `bun install --frozen-lockfile` (579 pkgs) → `bunx prisma generate` → `prisma migrate deploy` (48 migrations, clean DB creation) → full seed chain (Entry 31) → `bun run dev` (binds `0.0.0.0:4055`) → `/login` renders → `POST /api/hrm {"action":"auth.login","payload":{…}}` → first-login rotation (`passwordExpired` + `pwToken`) → `auth.password.change` → re-login (Bearer token) → authenticated `ess.dashboard` returns live seeded data (23 present / 12 late / 1 absent etc.).
+- **Honest detours recorded** (now §9.4 of the guide): the RPC envelope is `{action, payload}` — top-level params produce a clean 401 with an empty-email audit row; a foreign `DATABASE_URL` in the shell (sandbox artifact) overrides `.env` for the Prisma CLI and produces a confusing P1012.
+- **Next task**: Entry 34.
+
+### Entry 34 · Android development APK — actually generated and verified in the build environment **[no commit — artefact + guide; `mobile/android/` is gitignored CNG output]**
+- **Toolchain assembled** (all inside the build environment): Android cmdline-tools + `platform-tools`, `platforms;android-35`, `build-tools;35.0.0`, NDK 26.1.10909125 (auto-installed by Gradle), Temurin JDK 17 (the sandbox's Java 21 is JRE-only — Gradle toolchain fails with `[JAVA_COMPILER]` missing), Gradle 8.10.2 via the RN wrapper, AGP 8.6.0. A **sandbox-only** `~/.gradle/init.gradle` mirrored `repo.maven.apache.org` → Aliyun because Maven Central rate-limited (429) the sandbox IP on the large `react-android` AAR; no project file was modified for this.
+- **Build**: `npx expo prebuild -p android --no-install` → `gradlew assembleDebug` (13 attempts across disk/JDK/429 failures; final successful pass with `reactNativeArchitectures=arm64-v8a`) → **`app-debug.apk` — 151,081,956 bytes, 1,231 entries**. One cosmetic ledger task (`createDebugApkListingFileRedirect`, an IDE redirect file) could not complete — sandbox disk exhaustion (9.9 GB rootfs); the APK itself was fully packaged and is intact.
+- **Artefact verification**: `aapt2 dump badging` → package `com.finixhr.app`, versionName 1.0.0, versionCode 1, compileSdk 35, all expected permissions (fine/coarse/background location, camera, internet, notifications + POST_NOTIFICATIONS, boot-completed, vibrate, c2dm/FCM receive); `apksigner verify --print-certs` → exit 0, Android Debug certificate; contents: 22 dex files + full arm64-v8a native set (libc++_shared, libexpo-modules-core, libfbjni, libhermes, libjsi, fresco); **no embedded JS bundle** (debug build — JS is served by Metro at runtime, by design). Copied to the delivery folder as `finix-hr-dev-arm64-debug.apk`.
+- **Constraints stated in the guide**: debug-signed with the build environment's keystore (uninstall before reinstalling a locally-built variant), arm64-v8a only, requires Metro + `adb reverse tcp:8081 tcp:8081` (or the in-app dev-server host setting) — §4/§5 of the guide.
+- **DB changes**: none.
+- **Tests executed**: the build itself; `aapt2`/`apksigner` verification; gradle task ledger in `/tmp/gradle-final*.log` (ephemeral — the guide records the outcome, not the sandbox logs).
+- **Remaining limitations**: release-APK variant not built (disk); EAS cloud build not run (no EAS credentials in this environment); iOS untouched.
+- **Next task**: Entry 35.
+
+### Entry 35 · `LOCAL_BUILD_AND_DEVICE_TESTING_GUIDE.md` — the M5.1 deliverable **[this commit]**
+- **Files changed**: `docs/engineering/LOCAL_BUILD_AND_DEVICE_TESTING_GUIDE.md` (new, 11 required sections + a verified-evidence §0), this changelog.
+- **Functionality**: the single document the owner needs to build, install, launch and manually test Web + Android + Windows Desktop on their own hardware — exact commands only (Bun 1.4.2, JDK 17, PostgreSQL 17, `adb reverse`, firewall rule, `tauri dev`/`tauri build`, EAS profiles audit, URL-resolution rules, logging/troubleshooting incl. the seven traps actually hit during this cycle), the §8-matrix-based manual checklist with per-scenario evidence fields (A1–A7, B1–B6, C1–C6, D1–D5, + W1–W5 desktop rows), and the honest limitations register (device pass BLOCKED pending the owner's execution; iOS BLOCKED; hosted URLs unverified from here; targetSdk 34 store-ineligible by design for now).
+- **DB changes**: none.
+- **Tests executed**: `bash scripts/check-docs.sh` → all referenced paths/scripts exist (stage 8 green with the new file); full AFTER-gate below.
+- **Remaining limitations**: §10 execution is the owner's act — nothing in the repo claims VERIFIED-ON-DEVICE.
+- **Next task**: M6 planning with the owner (awaiting review/approval per the directive).
+
+### Cycle verification summary (M5.1)
+
+| Check | Before cycle (baseline `5b8071d`) | After cycle (verified 2026-10-31) |
+|---|---|---|
+| Root typecheck | PASS | **PASS** |
+| Root ESLint | 0 errors / 12 warnings | **0 errors / 12 warnings** (unchanged) |
+| Mobile typecheck | PASS | **PASS** |
+| Mobile ESLint | 0 errors / 10 warnings | **0 errors / 10 warnings** (unchanged) |
+| expo-doctor | 17/18 (1 advisory) | **18/18** |
+| Full gate `scripts/ci.sh` | exit 0 | **exit 0** — 14/14 stages |
+| Unit tests | 1,776/1,776 | **1,776/1,776** (158 files) |
+| Next.js production build | PASS | **PASS** |
+| Dev seed (`bun run seed`) | **CRASH** (TypeError, since baseline) | **completes** — 134,239 rows + verify exit 0 |
+| Web app local run | never verified | **verified end-to-end** (login → rotation → Bearer RPC) |
+| Android APK | not buildable here | **built + verified** (151 MB debug arm64) |
+| Windows desktop build | n/a in sandbox | **BLOCKED here** (no Rust/webkit2gtk) — previously verified on the owner's machine; exact commands in the guide |
+
+---
+
 ## 2026-10-31 — Fifth implementation cycle (M5: hosted-CI verification + T-18…T-20 + TD-27 investigation)
 
 ### Entry 23 · Baseline recovery + hosted-CI run verification (Phase 1) **[no commit — verification only]**
