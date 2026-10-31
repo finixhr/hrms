@@ -12,7 +12,7 @@
 | Phase (directive) | Backlog items | Status |
 |---|---|---|
 | 0 — Stabilization & engineering audit | T-01…T-09 | **COMPLETE & COMMITTED** (first cycle, 2026-10-30 — one commit per task on baseline `e7e34eb`; see `IMPLEMENTATION_CHANGELOG.md`) |
-| 1 — Backend & core hardening | T-10…T-12, T-18…T-20 | **T-10 + T-11 + T-12 COMPLETE** (M2 + M3, 2026-10-30 — suite 1683→1728 green, lint 0 errors, offline outbox server contract shipped; commits `d3c90aa`, `eefefa4`, `308ee38`, `dcbea29`); T-18…T-20 open |
+| 1 — Backend & core hardening | T-10…T-12, T-18…T-20 | **T-10 + T-11 + T-12 COMPLETE** (M2 + M3, 2026-10-30 — suite 1683→1728 green, lint 0 errors, offline outbox server contract shipped; commits `d3c90aa`, `eefefa4`, `308ee38`, `dcbea29`); **T-18 + T-19 + T-20 COMPLETE** (M5, 2026-10-31 — ESS payload bound + caps audit, ESS-plane isolation negative suite, registry aliases; commits `da905bf`, `c13b68d`, `1a0f9d9`) |
 | 2 — Shared UI/UX foundation | T-21 | planned (web SPA already largely conforms; mobile theme exists) |
 | 3 — Mobile: make core modules work | T-04…T-06, T-13…T-16 | Priority A delivered (first cycle); **T-13 selfie capture delivered (M3)**; offline outbox T-12 delivered (M3); **T-14…T-16 delivered (M4)** |
 | 4 — Desktop managed shell | T-09, T-22 | planned |
@@ -190,29 +190,25 @@
 - **Testing**: unit tests + manual (client toast audit documented).
 - **Complexity**: M.
 
-**T-18 · `ess.leave` payload bound + ESS list caps audit**
+**T-18 · `ess.leave` payload bound + ESS list caps audit** ✅ delivered (M5, 2026-10-31)
 - **Problem**: `ess.leave` returns the employee's full request history unbounded (ESS-07 capped siblings at 200).
-- **Solution**: `take: 200` + optional month filter; audit remaining ESS actions for unbounded reads.
-- **Files**: `src/hrm-server/routes/ess.ts`.
-- **Acceptance**: response size bounded; existing tests green.
-- **Testing**: unit test addition.
+- **Delivered scope**: request history capped at the 200 most recent + OPTIONAL month/year filter on the leave START date (`fromDate` prefix — same shape `ess.attendance` uses); the full audit of every remaining ESS action shipped in the same commit — profile documents 100, own bank accounts 20 (primary-first order), loans/advances/guarantee queue 100, performance reviews/kpis/cycles 100, documents/letters 100, myAssets assignments 200, leave-type catalog 100, colleagues org catalogs 200, substitutes 200; decoration `in:`-set reads classified transitively bounded (payrollRun/employee/loanInstallment/asset) with the reasoning pinned in the test allowlist.
+- **Files**: `src/hrm-server/routes/ess.ts`, `tests/unit/t18-ess-list-caps.test.ts` (new, 6 tests: behavioral cap, month filter, substitute cap, shape preservation, structural pin over EVERY findMany, documented cap values).
+- **Acceptance**: response size bounded; existing tests green — **met** (1776/1776 after; web+mobile callers send no payload, shape unchanged).
 - **Complexity**: S.
 
-**T-19 · Tenant-isolation negative tests for the ESS plane**
+**T-19 · Tenant-isolation negative tests for the ESS plane** ✅ delivered (M5, 2026-10-31)
 - **Problem**: existing isolation tests cover HR routes; the ESS self-scope family (and new mobile traffic) deserves explicit negative coverage.
-- **Solution**: cross-tenant/cross-employee denial tests for `ess.*` + `tracking.status` + geofence check-in actor resolution.
+- **Delivered scope**: `tests/unit/ess-isolation.test.ts` — 20 tests at the REAL dispatcher boundary (POST /api/hrm): cross-tenant ess.* reads never leak vendor-B rows under forged employeeId/vendorId payloads (leave/attendance/tasks/expenses/documents/performance) + symmetric positive control; cross-employee markers never leak; `ess.payroll.html` IDOR (coworker's/other-tenant entryId → 404, every combination); `tracking.status` actor resolution (EMPLOYEE self-only 403s, staff-without-attendance.edit 403 — via PAYROLL_OFFICER, a role whose template genuinely lacks it, because RBAC-103 grants only widen); punch actor resolution for geofence/selfie/selfCheckout (forged employeeId → 403; staff act-for-other needs permission AND scope — cross-tenant → 404 with nothing written; same-tenant privileged path as positive control); no-profile sessions get clean denials.
 - **Files**: `tests/unit/ess-isolation.test.ts` (new).
-- **Acceptance**: tests prove vendor/employee scoping under adversarial payloads.
-- **Testing**: they are the tests.
+- **Acceptance**: tests prove vendor/employee scoping under adversarial payloads — **met** (20/20 twice consecutive).
 - **Complexity**: M.
 
-**T-20 · Prefixed aliases for unprefixed route modules**
+**T-20 · Prefixed aliases for unprefixed route modules** ✅ delivered (M5, 2026-10-31)
 - **Problem**: `performance.ts`/`roadmap.ts` register unprefixed actions (`cycles.list`, `reimbursements.list`…) — the root cause of the mobile app's imagined namespace (contract audit §5.1).
-- **Solution**: registry alias support (`performance.reviews.list` → same handler) after inventorying every web-SPA call site; deprecation note for flat names.
-- **Dependencies**: web call-site inventory (grep `rpc(`/api-client usage).
-- **Files**: `src/hrm-server/routes/performance.ts`, `roadmap.ts`, `registry.ts`.
-- **Acceptance**: both names resolve; contract test extended.
-- **Testing**: unit tests.
+- **Delivered scope**: registry `alias(action, target)` — the alias SHARES the canonical RouteDef object (same handler/perm/schema/lockout classification — drift impossible by construction), loud failures on unknown target/collision, `routeAliases` + `isRouteAlias()` exported; 42 aliases registered (performance.cycles/reviews/kpiTemplates/kpiAssignments/tasks.*; ait.taxExemptions.*; payroll.salaryTemplates.* + payroll.salaryRevisions.list; attendance.overtime.*; expenses.reimbursements.*; employees.orgChart.* + promotions.list + transfers.list; letters.exitPacket.generate; settings.auditRetention.purge + settings.backups.export). `shifts.autoRoster` / `payroll.reversals` / `employees.bulkImport` were already module-prefixed — deliberately not re-aliased. Web call-site inventory done FIRST: 35 live flat call sites verified (flat names stay canonical, keep resolving, deprecated for new consumers — deprecation note in `API_CONTRACT_AUDIT.md` §5.1 + new §9 record).
+- **Files**: `src/hrm-server/routes/registry.ts`, `performance.ts`, `roadmap.ts`, `tests/unit/t20-route-aliases.test.ts` (new, 8 tests: def-object identity, exact inventory pin, SPA back-compat, prefix-gate parity, dispatcher behavioral parity incl. permission-denial parity), `docs/engineering/API_CONTRACT_AUDIT.md`.
+- **Acceptance**: both names resolve; contract test extended — **met**.
 - **Complexity**: M.
 
 ### P2 — quality & completeness
@@ -313,8 +309,45 @@ and the gate it runs are verified locally and ready.
   14-stage workflow is committed and ready; see `PRODUCTION_READINESS_CHECKLIST.md` §6 for the
   exact setup steps.
 
-Recommended next milestone: **M5 = T-18/T-19/T-20** (ess.leave bound, ESS isolation negative
-tests, prefixed aliases) **+ the first hosted-CI run** (needs only a push credential — the
-integration work is already committed) **+ a device-verification pass** (TD-26: T-14 wizard,
-T-15 push, M3 selfie/NetInfo on physical Android + iOS). Then T-21/T-22 (UI conformance sweep,
-desktop shell hardening).
+**M5 is complete** (2026-10-31, fifth session — hosted-CI verification + T-18…T-20 + TD-27 investigation):
+- **Baseline recovered first**: the sandbox recycle had again destroyed `.git/objects` (and the gh CLI/credential
+  store with it); restored from the user's session4 bundle
+  (`finix-hr-main-20261030-session4.bundle`) and re-fetched `origin/main` — local `main` =
+  `origin/main` = `86ef368`, clean tree, zero divergence. The stale pre-M3 working tree was kept
+  aside (nothing deleted).
+- **Hosted CI verified (Phase 1)** via the GitHub REST API (per-job, per-step): run **41091970369**
+  (CI #8, push, `main` @ `86ef368` = the latest intended main) — **success**: Web (16/16 steps incl.
+  the full 14-stage gate + Next build), Mobile (npm ci/tsc/expo-doctor), Docker (image build).
+  Honest findings recorded: the Docker job is **build-only — no registry push, no published
+  tag/digest**; E2E_SKIP=1 and advisory expo-doctor are the only deliberate skips (both printed,
+  not masked); the expo-doctor advisory failure (TD-30) is the run's one "error" annotation.
+- **T-18 / T-19 / T-20 delivered** (entries above; commits `da905bf`, `c13b68d`, `1a0f9d9`).
+- **Suite now 1776/1776** (+34 tests) with the full 14-stage local gate exiting 0 — ON A SATURDAY,
+  which surfaced and then fixed a date-dependent weekend flake (TD-31: ATT-006 + SCL-14 skipped
+  everyone when "yesterday" hit the default FRIDAY weekly-off; proven pre-existing at `86ef368`,
+  de-flaked with weekly-off-hermetic settings, commit `2a24156`).
+- **The M3-known mobile ESLint crash is fixed** (TD-23): root cause was ESLint 8.57 loading the
+  ROOT web-app flat config via ancestor search (mobile had no config of its own); fix =
+  `mobile/eslint.config.mjs` bridging eslint-config-expo through FlatCompat + two dead a11y
+  pragmas removed. Mobile lint: 0 errors / 10 warnings (TD-29), exit 0; tsc 0.
+- **TD-27 investigated (Phase 3), not implemented**: platform analysis + concrete wiring
+  recommendation in `OFFLINE_OUTBOX.md` §11 — Android feasible (WorkManager-backed
+  expo-background-fetch, best-effort ≥15 min, `stopOnTerminate:false`); **iOS BackgroundFetch
+  never fires for terminated apps (official docs)**; the M3 idempotent-replay contract already
+  makes cross-context duplicate-safe. Deferred because the acceptance test needs a physical
+  device this sandbox lacks.
+- **Device pass (Phase 2) BLOCKED, honestly**: no physical Android/iOS device, no emulator, no
+  Xcode. The full scripted matrix (auth/attendance/offline-outbox/push, per-scenario expected
+  results) is recorded in `PRODUCTION_READINESS_CHECKLIST.md` §8 — nothing device-dependent is
+  claimed from typecheck or simulator reasoning.
+- **M5 commits are LOCAL** (`da905bf`…): the sandbox again has no push credential; the
+  stage-identical local gate is green on the M5 tip, and the hosted-green verdict covers `86ef368`
+  only until the next push is re-verified.
+
+Recommended next milestone: **M6 = the device-verification pass + TD-27 Android background sync**
+(both are blocked on hardware — one Android + one iOS device unlocks the ENTIRE
+`PRODUCTION_READINESS_CHECKLIST.md` §8 matrix, the TD-26 acceptance, and the TD-27 terminated-app
+acceptance; the wiring spec is ready in `OFFLINE_OUTBOX.md` §11) **+ push the M5 commits**
+(credential needed again after the sandbox recycle — plain fast-forward, no force) **and re-verify
+the hosted run on the M5 SHA with the same API method**. Then T-21/T-22 (UI conformance sweep,
+desktop shell hardening) and the §5 operations set (T-26…T-29) as the staging-readiness track.

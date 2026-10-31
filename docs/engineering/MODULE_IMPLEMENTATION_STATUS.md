@@ -2,7 +2,8 @@
 
 > Honest classification per the directive: **Fully / Partially / Not implemented / Blocked by backend / Blocked by product decision**.
 > A placeholder or broken-contract screen is NEVER "fully implemented". Status reflects the state **after the first implementation cycle (2026-10-30)** — i.e., including the P0 contract repairs in `IMPLEMENTATION_CHANGELOG.md`.
-> Server-side counts: 40 route files, 566 registered actions (verified by registry extraction 2026-10-30).
+> Server-side counts (2026-10-31, registry extraction at the M5 tip): **742 runtime entries = 700 canonical + 42 M5/T-20 aliases** (aliases share their canonical RouteDef objects); the static permission lint (`audit-perms.py`) gates/annotates **602** `route()`-registered actions (unchanged by M5 — aliases are invisible to it by design and inherit their canonical's gate).
+> M5 update (2026-10-31): ESS-plane payload bounds + isolation coverage delivered (T-18/T-19); route namespace consistency delivered (T-20). Rows below annotated where affected.
 
 Legend: **S**=server actions exist · **W**=web SPA screens · **M**=mobile native screens.
 
@@ -17,7 +18,7 @@ Legend: **S**=server actions exist · **W**=web SPA screens · **M**=mobile nati
 | Attendance view (today/week/month) | ✅ `ess.attendance` | ✅ | ✅ rewired | **Functional** |
 | Check-in / check-out (GPS/geofence) | ✅ geofence.checkin/checkout + selfCheckout | ✅ | ✅ offline outbox (M3/T-12) | **Functional incl. offline**: punches queue on-device (`finixhr_outbox_v1`), replay with the same `clientEventId` (server-side idempotent replay, commit `dcbea29`); success shown only after server confirmation — see `OFFLINE_OUTBOX.md`. `selfCheckout` fallback stays online-only (no idempotency key in its schema) |
 | Selfie attendance | ✅ `attendance.selfie.checkin` + replay-safe proof write | ✅ (web upload flow) | ✅ native capture (M3/T-13) | **Functional**: front-camera capture → ≤640px JPEG → explicit confirm → authenticated upload; policy-required selfie attaches to geo punches; online-only by design (photo never stored on device); selfie = proof of presence, NOT identity verification (§27) |
-| Leave (balances/types/apply/history) | ✅ `ess.leave` + `leaveRequests.apply` | ✅ | ✅ rewired | **Functional**: `fromDate`/`toDate` contract fixed |
+| Leave (balances/types/apply/history) | ✅ `ess.leave` + `leaveRequests.apply` | ✅ | ✅ rewired | **Functional**: `fromDate`/`toDate` contract fixed; request history bounded at 200 + optional month filter (M5/T-18) |
 | Payslips | ✅ `ess.payroll` + `.html` | ✅ | ✅ (was already correct) | **Functional** — HTML document rendered in WebView viewer (legitimate use) |
 | Notifications | ✅ `notifications.list/read/unreadCount` | ✅ | ✅ rewired | **Functional** (read-state display; mark-read action pending polish). Push registration is now fail-closed honest (M4/T-15); real-device push E2E unverified (TD-26) |
 | Employee directory | ✅ `ess.colleagues` | ✅ | ✅ rewired | **Functional** (names + org context only — by design) |
@@ -28,7 +29,7 @@ Legend: **S**=server actions exist · **W**=web SPA screens · **M**=mobile nati
 |---|---|---|---|---|
 | ESS hub (announcements, documents, expenses) | ✅ `ess.documents`, `ess.expenses`, `announcements.list` | ✅ | ✅ rewired | **Functional** |
 | Tasks / goals | ✅ `ess.tasks` | ✅ | ✅ (via ESS + performance screen) | **Functional** (view-only; comments/status changes web-only for now) |
-| Performance (reviews, KPIs) | ✅ `ess.performance` | ✅ | ✅ rewired | **Functional** (view + acknowledge pending) |
+| Performance (reviews, KPIs) | ✅ `ess.performance` (+ `performance.*` aliases, M5/T-20) | ✅ | ✅ rewired | **Functional** (view + acknowledge pending); flat `cycles/reviews/kpi*` names now have deprecated prefixed twins |
 | Support tickets | ✅ `support.tickets`, `support.ticket.create/reply/close/reopen` | ✅ | ✅ rewired (create + list) | **Partial**: create/list fixed; reply/close/reopen not yet in mobile UI |
 | Recruitment (HR users) | ✅ `recruitment.openings.list`, `applications.*` | ✅ | ✅ permission-gated rewired | **Partial (by design)**: HR users see openings; employee plane excludes it (product decision §7 health report) |
 | Reports (HR users) | ✅ `reports.templates.*`, `reports.attendanceOverview` | ✅ rich | ✅ permission-gated rebuilt | **Partial**: templates + attendance overview; deep report builder remains web-only |

@@ -5,6 +5,70 @@
 
 ---
 
+## 2026-10-31 — Fifth implementation cycle (M5: hosted-CI verification + T-18…T-20 + TD-27 investigation)
+
+### Entry 23 · Baseline recovery + hosted-CI run verification (Phase 1) **[no commit — verification only]**
+- **Baseline found (not assumed)**: the sandbox recycle again destroyed `.git/objects` (and the gh CLI/credential store). Restored from the user's `finix-hr-main-20261030-session4.bundle` (HEAD `86ef368`), re-fetched `origin/main` — **local `main` = `origin/main` = `86ef368`, clean tree, 0/0 ahead-behind**. The stale pre-M3 working tree found in the sandbox was moved aside, nothing deleted.
+- **Hosted CI verified with API evidence** (not the JS-heavy web page): run **41091970369** — CI #8, push event, `main` @ `86ef368` (the latest intended main), conclusion **success** 16:40:08Z→16:48:53Z. Per-job/per-step: Web success (16/16 steps: pinned Bun 1.4.2 frozen install, prisma generate + migrate deploy, tsc, ESLint hard gate, secret scan, full `scripts/ci.sh`, Next.js build), Mobile success (npm ci, tsc, expo-doctor advisory), Docker success (`docker build -t finix-hr:86ef368…`).
+- **Honest findings recorded**: the Docker job is **build-only — no registry push step exists**; no image tag/digest is published anywhere (build ≠ push ≠ deployment). The run's one "error" annotation is the advisory expo-doctor version-pin finding (TD-30) — continue-on-error by design. E2E_SKIP=1 is the only other deliberate skip (printed, not masked).
+- **Timing cross-check** resolved a contradiction in the web-page scrape ("Mobile failed"): `docker-build` has `needs: [web, mobile]` and it RAN (1m44s after Web finished) — a failed Mobile would have skipped Docker and ended the run at Web's 6m53s, not 8m45s. The API's per-step data confirms Mobile green.
+- **Tests executed**: GitHub REST API `/actions/runs/41091970369` + `/jobs` (HTTP 200) — the authoritative source.
+- **Limitations**: the run covers the M4 SHA `86ef368`; M5 commits are local (no push credential again — wiped by the recycle).
+- **Next task**: T-18.
+
+### Entry 24 · T-18 · `ess.leave` payload bound + full ESS list-caps audit **[commit `da905bf`]**
+- **Task**: cap the one remaining unbounded ESS read; audit every remaining ESS action for unbounded reads (master plan T-18, P1).
+- **Files changed**: `src/hrm-server/routes/ess.ts` (+50/−6), `tests/unit/t18-ess-list-caps.test.ts` (new).
+- **Functionality**: request history `take: 200` (newest first) + OPTIONAL `{ month, year }` filter on the leave START date (`fromDate` prefix, mirroring `ess.attendance`); substitutes 200; profile documents 100; own bank accounts 20 (primary-first — the model has no timestamp, caught by tsc); loans/advances/guarantees 100; performance reviews/kpis/cycles 100; documents/letters 100; myAssets 200; leave-type catalog 100; colleagues org catalogs 200. Decoration `in:`-set reads classified transitively bounded with the reasoning pinned in the test allowlist. Response shape unchanged — existing web/mobile callers send no payload.
+- **DB changes**: none.
+- **Tests executed**: `bun test tests/unit/t18-ess-list-caps.test.ts` — **6/6** (behavioral cap at 230 seeded rows, month filter incl. cross-year, substitute cap at 250, shape preservation, structural pin over EVERY findMany in ess.ts, documented cap values).
+- **Remaining limitations**: the structural pin allowlists month-prefix reads and `in:`-set decoration reads by design (each classification documented in-file).
+- **Next task**: T-19.
+
+### Entry 25 · T-19 · Tenant-isolation negative tests for the ESS plane **[commit `c13b68d`]**
+- **Task**: prove vendor/employee scoping under adversarial payloads for `ess.*` + `tracking.status` + punch actor resolution (master plan T-19, P1).
+- **Files changed**: `tests/unit/ess-isolation.test.ts` (new, 290 lines).
+- **Functionality**: 20 tests at the REAL dispatcher boundary — cross-tenant ess.* reads under forged `employeeId`+`vendorId` payloads never leak vendor-B rows (six read families + symmetric positive control); same-tenant coworker markers never leak; `ess.payroll.html` IDOR (every entryId combination → 404); `tracking.status` actor resolution (EMPLOYEE self-only, staff-without-attendance.edit via PAYROLL_OFFICER); punch actor resolution for all three self-service punch actions (forged id → 403; staff act-for-other needs permission AND tenant scope — cross-tenant 404 with zero rows written; same-tenant privileged path as audited positive control); no-profile sessions get clean denials.
+- **DB changes**: none (fixtures only).
+- **Tests executed**: `bun test tests/unit/ess-isolation.test.ts` — **20/20 twice consecutive**.
+- **Re-learned honestly en route**: RBAC-103 permission resolution is role-template ∪ explicit grants (grants only widen) — an HR_ADMIN can never be stripped below template, so the missing-permission denial is probed with PAYROLL_OFFICER (a role whose template genuinely lacks `attendance.edit`); `tracking.status`'s no-profile Deny carries no explicit code (403) while ess.* uses 400. Expectations were corrected against actual behavior, never the reverse.
+- **Remaining limitations**: none for the documented scope.
+- **Next task**: T-20.
+
+### Entry 26 · T-20 · Prefixed aliases for unprefixed route modules **[commit `1a0f9d9`]**
+- **Task**: registry alias support with both names resolving, after the web call-site inventory (master plan T-20, P1; contract audit §5.1).
+- **Files changed**: `src/hrm-server/routes/registry.ts` (+38), `performance.ts` (+29), `roadmap.ts` (+31), `ess.ts` (orderBy fix), `tests/unit/t20-route-aliases.test.ts` (new), `docs/engineering/API_CONTRACT_AUDIT.md` (§5.1 resolution + §9 M5 record).
+- **Functionality**: `alias(action, target)` registers a prefixed twin sharing the canonical RouteDef OBJECT (perm/schema/handler/lockout classification identical by construction; loud failures on unknown target/collision); 42 aliases (16 `performance.*`, 26 feature-module-prefixed roadmap twins); flat names stay canonical + deprecated for new consumers. Dispatcher gating parity proven: no alias prefix enters `SAAS_ACTION_PREFIX_MODULE`, alias heads match canonical heads for the lockout heuristic, perm gates are shared objects.
+- **DB changes**: none.
+- **Tests executed**: `bun test tests/unit/t20-route-aliases.test.ts` — **8/8** (def-object identity for all 42, exact inventory pin, 37 SPA flat call sites keep resolving, prefix-gate parity, dispatcher behavioral parity incl. identical permission denials); `python3 scripts/audit-perms.py` — 602 actions gated/annotated, frontend calls all resolve; regression batch (mobile-contract, payload-validation, r3-5-wave, employees-perms + the three M5 suites) — **133/133**.
+- **Remaining limitations**: flat-name removal would need a coordinated migration — explicitly out of scope (deprecation only).
+- **Next task**: full-gate regression.
+
+### Entry 27 · De-flake the attendance sweeps (weekend class) **[commit `2a24156`]**
+- **Task found during regression**: ATT-006 + SCL-14 failed on the full suite run — investigation proved the failures PRE-EXISTING (identical at baseline `86ef368`, the SHA that passed hosted CI): both tests use a RELATIVE `yesterday`, and the default `weeklyHoliday` is `["FRIDAY"]` (BD convention) — on Sat 2026-10-31 "yesterday" was the weekly off, so the sweep skipped everyone. Hosted CI passed Friday only because Thursday preceded it; every Fri/Sat gate run would have been red.
+- **Files changed**: `tests/unit/r3-engines.test.ts`, `tests/unit/phase2-ws1-scheduler.test.ts` (weekly-off-hermetic settings objects passed to the sweeps; each test keeps verifying exactly what it verified before).
+- **Tests executed**: the two files — 28/28 on a Saturday; full suite **1776/1776**.
+- **Remaining limitations**: r3-4's ATT-303 was already safe (fixed Monday date).
+- **Next task**: mobile lane verification.
+
+### Entry 28 · Mobile ESLint crash fixed + mobile lane verified **[commit `a248376`]**
+- **Task**: the M3-known `npx eslint .` crash (TD-23) — root-caused and fixed while running the M5 regression lanes.
+- **Root cause**: mobile had NO ESLint config of its own; ESLint 8.57 (flat-capable) searched ancestors, loaded the ROOT web-app `eslint.config.mjs`, and instantiated its typescript-eslint v8 rules under the mobile-local 8.57 linter → TypeError on `no-unused-expressions` options shape.
+- **Files changed**: `mobile/eslint.config.mjs` (new — FlatCompat bridge for `eslint-config-expo@8`, plugins resolve from the mobile tree), `mobile/app/(auth)/mfa-enroll.tsx` + `mobile/src/components/SelfieCapture.tsx` (two dead a11y disable pragmas removed — they referenced a rule no mobile config defines and broke the now-working run).
+- **Tests executed**: `npx eslint .` in mobile/ — **0 errors / 10 warnings, exit 0** (warnings split out as TD-29); `npx tsc --noEmit` — 0; `npx expo-doctor` — 17/18 (1 advisory version-pin finding, TD-30, same as the hosted run's annotation); `npm ci` — clean.
+- **Remaining limitations**: mobile lint is still NOT a hosted-CI gate (candidate once TD-29's warnings clear); no dependency changes made (eslint-plugin-jsx-a11y was tested and removed — the config chain does not reference it).
+- **Next task**: documentation.
+
+### Entry 29 · M5 documentation + TD-27 investigation + device matrix **[this commit]**
+- **TD-27 (Phase 3) investigated, NOT implemented**: full platform analysis + wiring recommendation in `OFFLINE_OUTBOX.md` §11 — Android feasible via expo-background-fetch (WorkManager, best-effort ≥15 min, `stopOnTerminate:false` covers terminated apps; Doze/vendor battery managers may defer); **iOS BackgroundFetch never fires for terminated apps (official Expo docs)** — the honest iOS contract is foreground/notification-tap sync; headless-context drain is spec'd (`getEngine(); load(); syncOnce()`); the M3 idempotent-replay contract already makes cross-context duplicate-safe. Deferred: the acceptance test needs a physical device.
+- **Device pass (Phase 2) BLOCKED, honestly**: no physical device/emulator/Xcode in the sandbox. The complete scripted matrix (24 scenarios: auth A1–A7, attendance B1–B6, offline outbox C1–C6, push D1–D5, each with expected results and today's evidence column) is recorded in `PRODUCTION_READINESS_CHECKLIST.md` §8.
+- **Docs updated**: MASTER_IMPLEMENTATION_PLAN (T-18/19/20 delivered + M5 record + M6 recommendation), TECHNICAL_DEBT_REGISTER (TD-7/9/23/24 resolved; TD-26/27 re-scoped; TD-29/30/31 added), MODULE_IMPLEMENTATION_STATUS (counts + affected rows), PRODUCTION_READINESS_CHECKLIST (verdicts, §6 hosted-CI resolution, §7 risks, §8 device matrix), API_CONTRACT_AUDIT (§5.1 resolution + §9), OFFLINE_OUTBOX (§11).
+- **Full-gate regression (Phase 5)**: `scripts/ci.sh` (E2E_SKIP=1) — **exit 0, 1m58s** on a Saturday (all 14 stages: tsc, lint 0 errors, unit 1776/1776, config guard, secret scan, scrypt gate, destructive-op guard, docs guard, permission lint 602, dependency audit, fresh-DB migration smoke, schema drift, perf budget, E2E skipped-by-design). Mobile: npm ci + tsc 0 + eslint 0 errors + expo-doctor 17/18. Docker build: **NOT RUN locally (no docker in this sandbox)** — last verified by hosted CI at `86ef368`.
+- **Remaining limitations**: M5 commits local (no push credential); device matrix BLOCKED; TD-27 implementation deferred to a device-in-the-loop session.
+- **Next task**: M6 — push + re-verify hosted CI on the M5 SHA, then the device pass + TD-27 Android wiring.
+
+---
+
 ## Continuation note (2026-10-30, second session)
 
 The first implementation cycle was interrupted mid-flight: the mobile fixes,

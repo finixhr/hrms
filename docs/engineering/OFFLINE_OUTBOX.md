@@ -227,3 +227,97 @@ documented MFA back-compat tolerances were repaired in the M2 cycle).
    offline punch that conflicts with a later online punch surfaces as
    REVIEW_REQUIRED with evidence, and HR decides. No automatic conflict
    resolution is claimed.
+
+---
+
+## 11. TD-27 investigation — background synchronization (M5, 2026-10-31)
+
+Phase-3 deliverable of the M5 cycle: a technical recommendation BEFORE any
+implementation change. No code was changed for TD-27 in M5; this section is
+the investigated record the implementation session will build on.
+
+### 11.1 What the platform actually permits
+
+**Android** (via `expo-background-fetch`, which maps to WorkManager):
+- Periodic tasks with an OS-enforced floor of ~15 minutes in practice (the
+  module's own default interval is 10 minutes; WorkManager batches to ≥15).
+- `stopOnTerminate: false` (default) keeps the task eligible **after the app
+  is terminated** — this is the mechanism a terminated-app outbox drain needs.
+- `startOnBoot: true` re-arms after device reboot (adds
+  `RECEIVE_BOOT_COMPLETED` + `WAKE_LOCK` permissions automatically).
+- Doze / App Standby / vendor battery managers (Samsung, Xiaomi, Oppo…) may
+  defer or drop periodic work entirely; users must sometimes opt the app out
+  of battery optimization. **No delivery guarantee — best effort only.**
+
+**iOS** (BGTaskScheduler / BGAppRefreshTask via the same module):
+- Official Expo docs, verbatim: *"BackgroundFetch only works when the app is
+  backgrounded, not if the app was terminated or upon device reboot."*
+- Even for a backgrounded app, scheduling is opportunistic, budgeted
+  (frequency decays if the user rarely opens the app), suppressed by Low
+  Power Mode, and each invocation gets ~30 seconds of runtime.
+- A force-quit by the user kills all background eligibility until the next
+  manual launch.
+- Silent pushes (`content-available: 1`) can nudge a **backgrounded** app
+  (throttled by APNs, require push entitlements + server-side trigger) and
+  do nothing for a terminated one.
+- **Conclusion: terminated-app sync on iOS is not achievable with public
+  APIs. The honest iOS contract is: sync on foreground return, notification
+  tap, or app launch.**
+
+**Expo/React Native constraints:**
+- JS timers die when the app backgrounds — the current wiring's
+  `scheduleSync`/backoff timers only run while the app is foregrounded
+  (by design; the engine re-evaluates backoff gates on the next pass).
+- On Android, a WorkManager task for a terminated app runs in a **headless
+  JS context**: a fresh module graph where `initOutbox()` never ran. A
+  background drain must therefore construct its own engine pass
+  (`getEngine(); await e.load(); await e.syncOnce()`) rather than reuse
+  UI-wired state. `offline.ts` imports are headless-safe (NetInfo/AppState
+  listeners are registered only inside `initOutbox`, never at import).
+
+### 11.2 Why the server contract already makes background sync SAFE
+
+The M3 server contract (§2–§5) was designed for exactly this:
+- **Duplicate prevention**: every punch carries `clientEventId`; a replay
+  from ANY context (foreground race, headless task, second device attempt)
+  resolves idempotently — exactly one row/event/proof/notification. A
+  headless-context sync racing a foreground sync cannot double-punch.
+- **Auth expiry during background sync**: the engine pauses on 401
+  (`authPaused`), loses nothing, and a background pass simply no-ops; the
+  user re-authenticates in the foreground and `resumeAfterLogin()` drains.
+  rpc() reads the token live from secure-store each attempt, so a token
+  refreshed by a concurrent foreground session is picked up too.
+- **Retry/recovery**: the existing exponential backoff with jitter,
+  stuck-syncing recovery, and permanent-failure terminality apply
+  unchanged; a background pass is just another `syncOnce()` caller.
+
+### 11.3 Recommendation (for the implementation session)
+
+1. **Android only**: add `expo-background-fetch` (SDK-52-matched version)
+   with `minimumInterval: 900`, `stopOnTerminate: false`,
+   `startOnBoot: true`; the registered task performs the headless-safe
+   engine pass above. Expectation to document in-product: *"Android syncs
+   queued punches periodically in the background, typically every 15+
+   minutes, subject to OS battery policies; delivery is best-effort."*
+2. **iOS**: do NOT claim background sync. Ship the foreground-return sync
+   (already working) + notification-tap routing. A silent-push nudge for
+   backgrounded apps is a possible later enhancement (needs entitlements +
+   a server trigger when HR-side events exist) — deferred, not promised.
+3. **Battery/network**: the drain is network-only (no GPS wake), bounded to
+   the queue cap, and OS-scheduled — no wakelocks of our own.
+4. **Guardrails**: keep the foreground triggers untouched (the reliable
+   path); the background task must never auto-retry synchronously beyond
+   one pass; measure battery impact on a real device before release.
+5. **Acceptance (TD-27, unchanged)**: a terminated-app punch syncs without
+   user interaction on Android (real-device test — cannot be claimed from
+   type-checking), and the iOS limitation is documented (this section).
+
+### 11.4 Why M5 did not implement it
+
+The M5 scope was T-18/T-19/T-20 + hosted-CI verification + the device pass
+(`MASTER_IMPLEMENTATION_PLAN.md`). This sandbox has **no physical Android or
+iOS device** (see PRODUCTION_READINESS_CHECKLIST.md §7), so the TD-27
+acceptance test cannot run here; adding the dependency and native rebuild
+without any device verification would ship a claim we cannot test — exactly
+what this project refuses to do. The wiring spec above is deliberately
+concrete so a device-in-the-loop session can implement it in one pass.
