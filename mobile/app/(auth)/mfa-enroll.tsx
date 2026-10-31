@@ -134,11 +134,12 @@ export default function MfaEnrollScreen() {
 
               <View style={styles.qrCard}>
                 {enrollData ? (
-                  // jsx-a11y/alt-text wants an `alt` prop (web DOM); React
-                  // Native Image has no alt — the RN equivalent,
-                  // accessibilityLabel, is set below and is what VoiceOver/
-                  // TalkBack actually read.
-                  // eslint-disable-next-line jsx-a11y/alt-text
+                  // React Native Image has no web-DOM `alt` prop — the RN
+                  // equivalent, accessibilityLabel, is set below and is what
+                  // VoiceOver/TalkBack actually read. (An a11y lint directive
+                  // used to sit here referencing a rule no mobile config
+                  // defines; it is gone now that the mobile lint actually
+                  // runs.)
                   <Image
                     source={{ uri: enrollData.qrDataUrl }}
                     style={styles.qrImage}

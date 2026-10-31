@@ -159,9 +159,11 @@ export function SelfieCapture({ visible, title, hint, onCancel, onConfirmed }: S
         <View style={styles.stage}>
           {captured ? (
             <View style={styles.previewWrap}>
-              {/* jsx-a11y/alt-text asks for `alt` (web DOM semantics); React
-                  Native Image exposes accessibility via accessibilityLabel. */}
-              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              {/* React Native Image exposes accessibility via
+                  accessibilityLabel (set below) — web-DOM `alt` semantics
+                  don't apply. (An a11y lint directive used to sit here
+                  referencing a rule no mobile config defines; it would break
+                  the now-working lint run.) */}
               <Image
                 source={{ uri: captured.dataUrl }}
                 style={styles.previewImg}
