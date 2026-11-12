@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "cap": 50,
+  "budgets": {
+    "payroll-preflight": { "p95_ms": 1200 },
+    "payroll-run-payment": { "p95_ms": 800 },
+    "leave-approval": { "p95_ms": 800 }
+  },
+  "history": []
+}

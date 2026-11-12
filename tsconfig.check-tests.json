@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

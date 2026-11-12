@@ -1,0 +1,158 @@
+# ============ GitHub Actions CI (OPS-6, pulled into the OPS P1 wave) =========
+# 2026-11-09 — the release tree shipped NO .github/workflows/ although
+# scripts/ci.sh (and the headers of migrate-fresh-smoke.ts /
+# check-schema-drift.ts) name .github/workflows/ci.yml as the wired-in CI
+# counterpart. This workflow closes that gap the honest way: it runs the
+# project's OWN gate — `bash scripts/ci.sh` — so the cloud runner and every
+# laptop execute the exact same stages (typecheck, lint, unit tests,
+# config/secret/scrypt/destructive/docs/permission/dependency guards,
+# fresh-database migration smoke, schema-drift gate, perf budget,
+# release-artifact validation). No stage is re-implemented here to drift.
+#
+# Database: a PostgreSQL 17 service container (the version the deployment
+# targets). tests/preload.ts picks its unit-test database from
+# TEST_DATABASE_URL (candidate #1); the migration smoke and schema-drift
+# gates derive their throwaway databases from the same URL — the service's
+# postgres superuser can CREATE/DROP them.
+#
+# The E2E lane (ci.sh stage 14) is skipped with E2E_SKIP=1: it boots a full
+# Next dev server against a self-managed scratch database and is better run
+# on a dedicated runner — remove the env below to include it here.
+#
+# The NIGHTLY k6 money-path lane (ci.sh stage 16, OPS-4) needs a reachable
+# STAGING deployment, seeded payroll/leave data and credentials — it is NOT
+# part of the push gate. The intended schedule is 00:30 Asia/Dhaka (18:30 UTC,
+# off-peak and ahead of the 01:05 backup cron, see ci.sh stage-16 comment);
+# the commented template below shows how to enable it once the repository
+# secrets exist.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # OPS-4 nightly lane — un-comment after creating the repository secrets
+  # HRM_K6_BASE_URL / HRM_K6_EMAIL / HRM_K6_PASSWORD (staging credentials).
+  # FIN-035 (Phase 3) adds the nightly e2e lane at 01:20 Asia/Dhaka (19:20 UTC
+  # — after the 01:05 backup cron so the load never races the pg_dump); the
+  # 00:30 k6 run and the 01:20 e2e run are separate cron entries so neither
+  # lane waits on the other.
+  # schedule:
+  #   - cron: "30 18 * * *" # 00:30 Asia/Dhaka — k6 + gates (ci.sh stage-16 comment)
+  #   - cron: "20 19 * * *" # 01:20 Asia/Dhaka — nightly e2e (ci.sh stage-21 comment)
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hrm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # tests/preload.ts candidate #1 — the isolated, force-reset unit-test
+      # database (job runs on the runner VM, so the service is on localhost)
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/hrm_test
+      # ci.sh stage 3 (w1-ac-07) defaults to a disposable 127.0.0.1:55432
+      # server that does not exist here — point its scratch database at the
+      # same service container instead
+      W1_AC07_SCRATCH_URL: postgresql://postgres:postgres@127.0.0.1:5432/hrm_w1_ac07_scratch
+      # E2E lane opt-out (see header) — delete to run scripts/e2e.sh here too
+      E2E_SKIP: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      # Bun toolchain (the repo pins bun 1.x via bun.lock; the action installs
+      # the latest 1.x — set `bun-version:` if the lockfile ever needs exact)
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Generate the throwaway CI encryption key
+        # Unit tests that exercise crypto-field need AN HRM_MFA_KEY (a real
+        # random one — the boot guard refuses known-leaked/example values).
+        # Generated per-run and never stored: no secret ships in this file.
+        run: echo "HRM_MFA_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run the project CI gate (scripts/ci.sh)
+        run: bash scripts/ci.sh
+
+  # ---- OPS-4 nightly k6 money-path lane (template — see header) -----------
+  # Un-comment together with the `schedule:` trigger above, create the
+  # repository secrets (HRM_K6_BASE_URL / HRM_K6_EMAIL / HRM_K6_PASSWORD —
+  # a payroll-entitled staging admin WITHOUT MFA), and adjust the k6 version:
+  #
+  # nightly:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 60
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: oven-sh/setup-bun@v2
+  #     - run: bun install --frozen-lockfile
+  #     - name: Install k6
+  #       run: |
+  #         curl -sSL -o /tmp/k6.deb \
+  #           https://github.com/grafana/k6/releases/download/v0.57.0/k6-v0.57.0-linux-amd64.deb
+  #         sudo dpkg -i /tmp/k6.deb
+  #     - name: Nightly gate (scripts/ci.sh stage 16)
+  #       env:
+  #         NIGHTLY: "1"
+  #         HRM_K6_BASE_URL: ${{ secrets.HRM_K6_BASE_URL }}
+  #         HRM_K6_EMAIL: ${{ secrets.HRM_K6_EMAIL }}
+  #         HRM_K6_PASSWORD: ${{ secrets.HRM_K6_PASSWORD }}
+  #       run: bash scripts/ci.sh
+
+  # ---- FIN-035 (Phase 3) nightly e2e lane (template) -----------------------
+  # The default push gate keeps its E2E_SKIP affordance; the NIGHTLY lane
+  # REFUSES to skip (a skipped gate was the original OPS-4 finding). It runs
+  # the full e2e suite — HTTP journeys + the whole Playwright tests/e2e-ui
+  # directory (including the FIN-030 desktop two-company switch smoke) —
+  # against the STANDALONE PRODUCTION build, on a runner with a PostgreSQL
+  # service (see the gate job for the service template). Triggered by the
+  # 01:20 Asia/Dhaka cron entry above.
+  #
+  # nightly-e2e:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 45
+  #   services:
+  #     postgres:
+  #       image: postgres:17
+  #       env:
+  #         POSTGRES_USER: postgres
+  #         POSTGRES_PASSWORD: postgres
+  #         POSTGRES_DB: hrm_test
+  #       ports: ["5432:5432"]
+  #       options: >-
+  #         --health-cmd "pg_isready -U postgres"
+  #         --health-interval 10s --health-timeout 5s --health-retries 10
+  #   env:
+  #     TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/hrm_test
+  #     DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/hrm_dev
+  #     E2E_SKIP: ""          # the nightly lane refuses to skip
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: oven-sh/setup-bun@v2
+  #     - run: echo "HRM_MFA_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+  #     - run: bun install --frozen-lockfile
+  #     - name: Install Playwright Chromium
+  #       run: bunx playwright install chromium --with-deps
+  #     - name: Nightly e2e (ci.sh stage 21)
+  #       env:
+  #         NIGHTLY: "1"
+  #       run: bash scripts/ci.sh

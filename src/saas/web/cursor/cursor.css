@@ -1,0 +1,478 @@
+/* ============ Custom cursor v2 — premium pointer designs ====================
+   Plain CSS on purpose (no Tailwind directives needed): the cursor is an
+   isolated micro-UI layered above the app. PERFORMANCE RULES:
+     1. JS-driven motion touches transform ONLY (per-frame, on the wrappers).
+     2. Every glow is a PRE-RENDERED gradient layer whose opacity animates —
+        box-shadow / background colors are never animated.
+     3. No backdrop-filter anywhere.
+   Colors are owner-configured hex values adapted to the active theme in JS
+   and delivered here as "r g b" triplets (--fxc-primary / --fxc-accent) plus
+   numeric feel knobs (--fxc-glow, --fxc-trail), all set on .fx-cursor.
+
+   Three designs on [data-design]:
+     aurora  — liquid gradient orb + trailing light + velocity squash
+     comet   — bright core + glass ring + particle ribbon
+     classic — minimal dot + glass ring
+
+   Activation contract: the engine adds `fx-on` to <html> only after JS has
+   confirmed fine-pointer + no reduced-motion + owner enablement. If any of
+   those fail, `fx-on` never lands and the native cursor stays everywhere.
+============================================================================ */
+
+/* ---- engine root (var fallbacks = designed defaults) ---- */
+.fx-cursor {
+  --fxc-primary: 129 140 248;
+  --fxc-accent: 167 139 250;
+  --fxc-glow: 0.65;
+  --fxc-trail: 0.65;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ---- native cursor suppression (only while the engine is active) ---- */
+html.fx-on,
+html.fx-on * {
+  cursor: none !important;
+}
+/* Text-editable surfaces always get their native cursor back (spec §7/§8).
+   Higher specificity + later source order beats the suppression above.
+   `input:not([type])` covers plain <input> (type defaults to text). */
+html.fx-on input:not([type]),
+html.fx-on input:is(
+    [type="text"], [type="email"], [type="password"], [type="search"],
+    [type="tel"], [type="url"], [type="number"], [type="date"],
+    [type="time"], [type="datetime-local"], [type="month"], [type="week"]
+  ),
+html.fx-on textarea,
+html.fx-on select,
+html.fx-on [contenteditable="true"],
+html.fx-on [contenteditable=""] {
+  cursor: auto !important;
+}
+/* Dense/dashboard zones can opt out entirely (spec §6). */
+html.fx-on [data-cursor-zone="native"],
+html.fx-on [data-cursor-zone="native"] *,
+html.fx-on [data-cursor="disabled"],
+html.fx-on [data-cursor="disabled"] * {
+  cursor: auto !important;
+}
+
+/* ---- 1:1 core dot (all designs) ---- */
+.fx-core {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  z-index: 3;
+  will-change: transform;
+  transition: opacity 180ms ease;
+}
+.fx-core-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: rgb(var(--fxc-primary));
+  box-shadow: 0 0 10px 1px rgb(var(--fxc-accent) / 0.85);
+  transition: transform 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ---- lerped follower wrapper (JS: translate + rotate + squash) ---- */
+.fx-follow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  will-change: transform;
+  transition: opacity 180ms ease;
+}
+.fx-cursor[data-design="aurora"] .fx-follow {
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+}
+.fx-cursor[data-design="comet"] .fx-follow {
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+}
+.fx-cursor[data-design="classic"] .fx-follow {
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+}
+
+/* ================= AURORA — liquid gradient orb ================= */
+.fx-orb-glow {
+  position: absolute;
+  inset: -24px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(var(--fxc-accent) / 0.55), rgb(var(--fxc-accent) / 0) 70%);
+  opacity: calc(var(--fxc-glow) * 0.5);
+  transition: opacity 300ms ease;
+}
+.fx-cursor[data-speed="move"] .fx-orb-glow {
+  opacity: calc(var(--fxc-glow) * 0.95);
+}
+.fx-orb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 34% 30%,
+    rgb(255 255 255 / 0.97),
+    rgb(var(--fxc-accent) / 0.92) 40%,
+    rgb(var(--fxc-primary) / 0.85) 68%,
+    rgb(var(--fxc-primary) / 0) 76%
+  );
+  transition: transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* aurora trailing light (JS lags it behind the pointer; shown only in motion) */
+.fx-tail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  z-index: 1;
+  will-change: transform;
+  opacity: 0;
+  transition: opacity 280ms ease;
+}
+.fx-tail-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(var(--fxc-accent) / 0.6), rgb(var(--fxc-accent) / 0) 68%);
+}
+.fx-cursor[data-design="aurora"][data-speed="move"] .fx-tail {
+  opacity: calc(var(--fxc-trail) * 0.85);
+}
+
+/* ================= COMET / CLASSIC — glass ring ================= */
+.fx-ring-glow {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(var(--fxc-accent) / 0.5), rgb(var(--fxc-accent) / 0) 70%);
+  opacity: calc(var(--fxc-glow) * 0.3);
+  transition: opacity 300ms ease;
+}
+.fx-cursor[data-speed="move"] .fx-ring-glow {
+  opacity: calc(var(--fxc-glow) * 0.7);
+}
+.fx-ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  border: 1.5px solid rgb(var(--fxc-primary) / 0.55);
+  background: rgb(var(--fxc-primary) / 0.06);
+  transition:
+    transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 200ms ease;
+}
+.fx-cursor[data-design="classic"] .fx-ring {
+  border-width: 1px;
+  border-color: rgb(var(--fxc-primary) / 0.5);
+}
+
+/* comet particle ribbon (pooled; each particle chases the previous) */
+.fx-trail-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+.fx-trail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+.fx-trail::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 9999px;
+  background: rgb(var(--fxc-accent));
+  box-shadow: 0 0 8px rgb(var(--fxc-accent) / 0.9);
+}
+.fx-trail:nth-child(1)::after  { width: 9px;    height: 9px;    margin: -4.5px 0 0 -4.5px;  opacity: 0.85; }
+.fx-trail:nth-child(2)::after  { width: 8px;    height: 8px;    margin: -4px 0 0 -4px;     opacity: 0.72; }
+.fx-trail:nth-child(3)::after  { width: 7px;    height: 7px;    margin: -3.5px 0 0 -3.5px; opacity: 0.6;  }
+.fx-trail:nth-child(4)::after  { width: 6.5px;  height: 6.5px;  margin: -3.25px 0 0 -3.25px; opacity: 0.5; }
+.fx-trail:nth-child(5)::after  { width: 6px;    height: 6px;    margin: -3px 0 0 -3px;     opacity: 0.42; }
+.fx-trail:nth-child(6)::after  { width: 5.5px;  height: 5.5px;  margin: -2.75px 0 0 -2.75px; opacity: 0.35; }
+.fx-trail:nth-child(7)::after  { width: 5px;    height: 5px;    margin: -2.5px 0 0 -2.5px; opacity: 0.28; }
+.fx-trail:nth-child(8)::after  { width: 4.5px;  height: 4.5px;  margin: -2.25px 0 0 -2.25px; opacity: 0.22; }
+.fx-trail:nth-child(9)::after  { width: 4px;    height: 4px;    margin: -2px 0 0 -2px;     opacity: 0.17; }
+.fx-trail:nth-child(10)::after { width: 3.5px;  height: 3.5px;  margin: -1.75px 0 0 -1.75px; opacity: 0.13; }
+.fx-trail:nth-child(11)::after { width: 3px;    height: 3px;    margin: -1.5px 0 0 -1.5px; opacity: 0.1;  }
+.fx-trail:nth-child(12)::after { width: 2.5px;  height: 2.5px;  margin: -1.25px 0 0 -1.25px; opacity: 0.08; }
+.fx-trail[data-off="1"] {
+  opacity: 0;
+}
+
+/* ================= AURORA TRAIL (Wave 11 §12) — gradient ribbon ============== */
+/* Chained like the comet particles, but each segment is a multi-hue gradient
+   bar whose size/opacity/hue drift down the chain — a subtle "aurora" ribbon
+   that fades into nothing. The chain position lives on --fx-i (set at build
+   time by the engine). Owner colors drive the gradient stops. */
+.fx-ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform, opacity;
+  opacity: 0;
+}
+.fx-ribbon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 9999px;
+  width: calc(16px - var(--fx-i) * 0.85px);
+  height: calc(7px - var(--fx-i) * 0.38px);
+  /* centered on the chain position; the static -8° tilt makes the chain read
+     as one flowing ribbon rather than a rigid row of bars */
+  margin: calc((7px - var(--fx-i) * 0.38px) / -2) 0 0 calc((16px - var(--fx-i) * 0.85px) / -2);
+  transform: rotate(-8deg);
+  background: linear-gradient(
+    90deg,
+    rgb(var(--fxc-primary) / calc(0.85 - var(--fx-i) * 0.07)),
+    rgb(var(--fxc-accent) / calc(0.6 - var(--fx-i) * 0.05))
+  );
+  filter: blur(calc(var(--fx-i) * 0.35px)) hue-rotate(calc(var(--fx-i) * 18deg));
+  box-shadow: 0 0 6px rgb(var(--fxc-accent) / calc(var(--fxc-glow) * (0.55 - var(--fx-i) * 0.045)));
+}
+.fx-cursor[data-speed="move"] .fx-ribbon {
+  opacity: calc(var(--fxc-trail) * (1 - var(--fx-i) * 0.085));
+}
+.fx-ribbon[data-off="1"] {
+  opacity: 0 !important;
+}
+
+/* ================= MAGNETIC SPARK (Wave 11 §12) — fading embers ============== */
+/* Sparks spawn along movement and die within 240–500ms; the JS loop writes
+   transform + opacity per frame (compositor-only). CSS defines the ember look:
+   a tiny radial accent dot with a soft glow — intentionally much lighter than
+   the comet ribbon (sparse, short-lived, airy). */
+.fx-spark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  will-change: transform, opacity;
+  opacity: 0; /* JS drives opacity while alive */
+  background: radial-gradient(
+    circle,
+    rgb(255 255 255 / 0.95),
+    rgb(var(--fxc-accent) / 0.9) 45%,
+    rgb(var(--fxc-primary) / 0) 75%
+  );
+  box-shadow: 0 0 7px rgb(var(--fxc-accent) / calc(var(--fxc-glow) * 0.8));
+}
+
+/* ---- "VIEW" morph target for large clickable visuals (spec §9) ---- */
+.fx-view {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  z-index: 4;
+  opacity: 0;
+  will-change: transform;
+  transition: opacity 200ms ease;
+}
+.fx-view-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  border: 1px solid rgb(var(--fxc-accent) / 0.65);
+  background: rgb(12 17 32 / 0.9);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35), 0 0 22px rgb(var(--fxc-accent) / 0.5);
+  transform: scale(0.7);
+  transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+html:not(.dark) .fx-view-inner {
+  background: rgb(255 255 255 / 0.94);
+  box-shadow: 0 10px 30px rgb(15 23 42 / 0.18), 0 0 22px rgb(var(--fxc-accent) / 0.4);
+}
+.fx-view-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgb(224 231 255);
+  white-space: nowrap;
+}
+html:not(.dark) .fx-view-label {
+  color: rgb(30 27 75);
+}
+
+/* ---- mode states (driven by data-mode on the engine root) ---- */
+/* the design's visual child scales; glow layers brighten via opacity only */
+.fx-cursor[data-mode="link"] .fx-orb,
+.fx-cursor[data-mode="link"] .fx-ring {
+  transform: scale(1.28);
+}
+.fx-cursor[data-mode="link"] .fx-ring {
+  border-color: rgb(var(--fxc-accent) / 0.85);
+}
+.fx-cursor[data-mode="link"] .fx-core-inner {
+  transform: scale(0.72);
+}
+
+.fx-cursor[data-mode="card"] .fx-orb,
+.fx-cursor[data-mode="card"] .fx-ring {
+  transform: scale(1.16);
+}
+.fx-cursor[data-mode="card"] .fx-core-inner {
+  transform: scale(0.85);
+}
+
+.fx-cursor[data-mode="button"] .fx-orb,
+.fx-cursor[data-mode="button"] .fx-ring {
+  transform: scale(1.45);
+}
+.fx-cursor[data-mode="button"] .fx-ring {
+  border-color: rgb(var(--fxc-accent) / 0.9);
+}
+.fx-cursor[data-mode="button"] .fx-core-inner {
+  transform: scale(0.72);
+}
+
+.fx-cursor[data-mode="magnetic"] .fx-orb,
+.fx-cursor[data-mode="magnetic"] .fx-ring {
+  transform: scale(1.55);
+}
+.fx-cursor[data-mode="magnetic"] .fx-ring {
+  border-color: rgb(var(--fxc-accent));
+  background: rgb(var(--fxc-accent) / 0.14);
+}
+.fx-cursor[data-mode="magnetic"] .fx-core-inner {
+  transform: scale(0.8);
+}
+.fx-cursor[data-mode="magnetic"] .fx-orb-glow,
+.fx-cursor[data-mode="magnetic"] .fx-ring-glow {
+  opacity: calc(var(--fxc-glow) * 1);
+}
+
+/* view: core + follower hand off to the badge (cross-fade) */
+.fx-cursor[data-mode="view"] .fx-core,
+.fx-cursor[data-mode="view"] .fx-follow,
+.fx-cursor[data-mode="view"] .fx-tail,
+.fx-cursor[data-mode="view"] .fx-trail-layer {
+  opacity: 0;
+}
+.fx-cursor[data-mode="view"] .fx-view {
+  opacity: 1;
+}
+.fx-cursor[data-mode="view"] .fx-view-inner {
+  transform: scale(1);
+}
+
+/* text: get out of the way entirely — the native caret is the truth (spec §7) */
+.fx-cursor[data-mode="text"] .fx-core,
+.fx-cursor[data-mode="text"] .fx-follow,
+.fx-cursor[data-mode="text"] .fx-tail,
+.fx-cursor[data-mode="text"] .fx-trail-layer,
+.fx-cursor[data-mode="text"] .fx-view,
+.fx-cursor[data-mode="disabled"] .fx-core,
+.fx-cursor[data-mode="disabled"] .fx-follow,
+.fx-cursor[data-mode="disabled"] .fx-tail,
+.fx-cursor[data-mode="disabled"] .fx-trail-layer,
+.fx-cursor[data-mode="disabled"] .fx-view,
+.fx-cursor[data-hidden="1"] .fx-core,
+.fx-cursor[data-hidden="1"] .fx-follow,
+.fx-cursor[data-hidden="1"] .fx-tail,
+.fx-cursor[data-hidden="1"] .fx-trail-layer,
+.fx-cursor[data-hidden="1"] .fx-view {
+  opacity: 0;
+}
+
+/* ---- press feedback (spec §10: subtle, paired with the ripple) ---- */
+.fx-cursor[data-pressed="1"] .fx-orb,
+.fx-cursor[data-pressed="1"] .fx-ring {
+  transform: scale(0.86);
+}
+.fx-cursor[data-pressed="1"] .fx-core-inner {
+  transform: scale(1.5);
+}
+
+/* ---- click ripple (spawned imperatively, self-removing) ---- */
+.fx-ripple {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 9999px;
+  border: 1.5px solid rgb(var(--fxc-accent) / 0.6);
+  pointer-events: none;
+  z-index: 2147483646;
+  animation: fx-ripple 220ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes fx-ripple {
+  from {
+    transform: scale(0.35);
+    opacity: 0.45;
+  }
+  to {
+    transform: scale(1.05);
+    opacity: 0;
+  }
+}
+
+/* ---- engine-moved elements (magnetic pull / card tilt) ----
+   The engine writes inline transforms per frame and disables transitions
+   for the hovered element only; these helpers just restore a soft snap-back
+   once it lets go. */
+.fx-magnetic,
+.fx-tilt {
+  will-change: transform;
+}
+
+/* ---- accessibility: no motion → no ornament transitions ---- */
+@media (prefers-reduced-motion: reduce) {
+  .fx-core-inner,
+  .fx-orb,
+  .fx-ring,
+  .fx-view-inner {
+    transition: none;
+  }
+  .fx-orb-glow,
+  .fx-ring-glow,
+  .fx-tail,
+  .fx-trail-layer {
+    transition: opacity 120ms ease;
+  }
+  .fx-ripple {
+    animation: none;
+    opacity: 0;
+  }
+}

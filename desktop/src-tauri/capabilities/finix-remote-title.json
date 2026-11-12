@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "finix-remote-title",
+  "description": "FIN-030 (Phase 3) — remote-origin capability for the workspace pages (a connected, VERIFIED Finix server; the launcher only ever navigates to verified hosts — see ui/app.js FIN-032). Grants the core event channel ONLY, so the page can push its <title> (which carries the active company, set by the web app's publishCompanyContext) to the Rust listener that mirrors it into the native title bar. The desktop window has no address bar, so the title bar is the only place a workstation can see whose books are open after a company switch. Security note: title-bar text only — the page body can already render arbitrary text, so this grant adds no new capability to a trusted server; commands remain remote-denied (see the default capability's description).",
+  "remote": true,
+  "local": false,
+  "windows": ["main"],
+  "permissions": ["core:event:default"]
+}

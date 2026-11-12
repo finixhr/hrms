@@ -1,0 +1,32 @@
+[package]
+name = "finix-hr"
+version = "1.0.0"
+description = "Finix HR Desktop"
+authors = ["Finix HR"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary to make the lib name
+# unique and wouldn't conflict with the bin name.
+name = "finix_hr_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+# FIN-034 (Phase 2) / DSK-1 — the update channel: security fixes currently
+# require a manual reinstall of v1.0.0 forever. tauri-plugin-updater delivers
+# signed update manifests (pubkey + endpoint configured in tauri.conf.json;
+# the plugin is now registered unconditionally in src/lib.rs, which checks
+# at startup, once a day, and via the "Check for Updates…" menu item — see
+# desktop/RELEASE-CHECKLIST.md). NOTE: Cargo.lock does not yet contain this
+# crate — run `cargo build` (or `cargo update`) once a Rust toolchain is
+# available so the lockfile is resolved before the next signed release.
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

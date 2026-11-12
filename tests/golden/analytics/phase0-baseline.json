@@ -1,0 +1,248 @@
+{
+ "attritionRate": {
+  "columns": [
+   "Month",
+   "Headcount (start)",
+   "Headcount (end)",
+   "Avg Headcount",
+   "Exits",
+   "Annualized Attrition Rate"
+  ],
+  "rows": [
+   [
+    "January 2026",
+    2,
+    2,
+    2,
+    0,
+    "0%"
+   ],
+   [
+    "February 2026",
+    2,
+    3,
+    2.5,
+    0,
+    "0%"
+   ],
+   [
+    "March 2026",
+    3,
+    3,
+    3,
+    0,
+    "0%"
+   ],
+   [
+    "April 2026",
+    3,
+    2,
+    2.5,
+    1,
+    "480%"
+   ],
+   [
+    "May 2026",
+    2,
+    2,
+    2,
+    0,
+    "0%"
+   ],
+   [
+    "June 2026",
+    2,
+    2,
+    2,
+    0,
+    "0%"
+   ],
+   [
+    "July 2026",
+    2,
+    2,
+    2,
+    0,
+    "0%"
+   ],
+   [
+    "August 2026",
+    2,
+    2,
+    2,
+    0,
+    "0%"
+   ],
+   [
+    "September 2026",
+    2,
+    2,
+    2,
+    0,
+    "0%"
+   ],
+   [
+    "October 2026",
+    2,
+    2,
+    2,
+    0,
+    "0%"
+   ],
+   [
+    "November 2026",
+    2,
+    2,
+    2,
+    0,
+    "0%"
+   ],
+   [
+    "December 2026",
+    2,
+    2,
+    2,
+    0,
+    "0%"
+   ]
+  ],
+  "meta": {
+   "count": 12,
+   "year": 2026,
+   "note": "annualized rate = month exits × 12 ÷ average headcount, average = (start + end) ÷ 2; exit months from resignation/lifecycle LWD records only (RPT-08 definition, FIN-077)",
+   "kpiDefinition": "Annualized Attrition Rate = (exits in month × 12) ÷ ((headcount at month start + headcount at month end) ÷ 2)",
+   "unattributedTerminal": [
+    {
+     "name": "FIN-085 Terminated",
+     "status": "TERMINATED"
+    }
+   ],
+   "warnings": [
+    "1 former employee(s) carry a terminal status with no lifecycle record — they are excluded from this report. Record their exit in Resignation & Exit to attribute them."
+   ]
+  }
+ },
+ "absenteeismTrend": {
+  "columns": [
+   "Month",
+   "Absent Employee-Days",
+   "Scheduled Working Employee-Days",
+   "Absenteeism Rate"
+  ],
+  "rows": [
+   [
+    "January 2026",
+    0,
+    52,
+    "0%"
+   ],
+   [
+    "February 2026",
+    0,
+    72,
+    "0%"
+   ],
+   [
+    "March 2026",
+    1,
+    81,
+    "1.2%"
+   ],
+   [
+    "April 2026",
+    0,
+    60,
+    "0%"
+   ],
+   [
+    "May 2026",
+    0,
+    52,
+    "0%"
+   ],
+   [
+    "June 2026",
+    0,
+    52,
+    "0%"
+   ],
+   [
+    "July 2026",
+    3,
+    50,
+    "6%"
+   ],
+   [
+    "August 2026",
+    0,
+    54,
+    "0%"
+   ],
+   [
+    "September 2026",
+    0,
+    52,
+    "0%"
+   ],
+   [
+    "October 2026",
+    0,
+    52,
+    "0%"
+   ],
+   [
+    "November 2026",
+    0,
+    52,
+    "0%"
+   ],
+   [
+    "December 2026",
+    0,
+    54,
+    "0%"
+   ]
+  ],
+  "meta": {
+   "count": 12,
+   "year": 2026,
+   "note": "rate = absent employee-days ÷ scheduled working employee-days (weekly-offs and holidays excluded); population follows joins and exits per month (FIN-078)",
+   "kpiDefinition": "Absenteeism Rate = ABSENT employee-days on scheduled working days ÷ scheduled working employee-days",
+   "unattributedTerminal": 1
+  }
+ },
+ "otCost": {
+  "columns": [
+   "Employee",
+   "OT Hours",
+   "Estimated Cost (৳)",
+   "Payroll OT (৳)",
+   "Variance (৳)",
+   "Formatted"
+  ],
+  "rows": [
+   [
+    "FIN-085 Steady",
+    3.5,
+    1046,
+    0,
+    1046,
+    "৳1045.67"
+   ]
+  ],
+  "meta": {
+   "count": 1,
+   "month": "2026-07",
+   "totalCost": 1046,
+   "payrollOtTotal": 0,
+   "note": "hourly basis = effective-dated basic ÷ 208h; tier multipliers follow the vendor OT rates; Payroll OT = the period's non-draft, non-cancelled runs (regular + adjustments)",
+   "kpiDefinition": "Estimated OT Cost = Σ over OT minutes of (minutes ÷ 60) × (basic in force that day ÷ 208) × day-type multiplier",
+   "reconciliation": {
+    "runs": 0,
+    "varianceThresholdPct": 5,
+    "warnings": [],
+    "noRun": "no calculated payroll run for 2026-07 — the Payroll OT column is ৳0 by absence, not by confirmation"
+   }
+  }
+ }
+}

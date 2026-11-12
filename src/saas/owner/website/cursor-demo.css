@@ -1,0 +1,170 @@
+/* ============ Cursor tab — live design previews ==============================
+   Pure-CSS animated miniatures of the three cursor designs, shown inside the
+   Owner Console design picker. Colors come from the owner's current form
+   values, injected as --demo-primary / --demo-accent on .demo-stage, so the
+   preview re-tints the moment a color is picked.
+
+   The stage is deliberately dark in both console themes: it reads as a tiny
+   viewport of the public website and keeps the glow legible.
+============================================================================ */
+
+.demo-stage {
+  --demo-primary: #818cf8;
+  --demo-accent: #a78bfa;
+  position: relative;
+  height: 84px;
+  overflow: hidden;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 1px 1px, rgb(148 163 184 / 0.14) 1px, transparent 0) 0 0 / 20px 20px,
+    rgb(3 7 24);
+}
+
+/* shared looping flight path (rounded rectangle, ease-in-out) */
+@keyframes fx-demo-path {
+  0% {
+    transform: translate(16px, 18px) scale(1);
+  }
+  25% {
+    transform: translate(184px, 26px) scale(1.06);
+  }
+  50% {
+    transform: translate(152px, 58px) scale(1);
+  }
+  75% {
+    transform: translate(30px, 54px) scale(0.96);
+  }
+  100% {
+    transform: translate(16px, 18px) scale(1);
+  }
+}
+
+/* ---- aurora: gradient orb + lagging light tail ---- */
+.demo-orb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 34% 30%,
+    rgb(255 255 255 / 0.97),
+    var(--demo-accent) 42%,
+    var(--demo-primary) 70%,
+    transparent 78%
+  );
+  filter: drop-shadow(0 0 7px var(--demo-accent));
+  animation: fx-demo-path 4.2s ease-in-out infinite;
+}
+.demo-tail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--demo-accent), transparent 70%);
+  opacity: 0.55;
+  animation: fx-demo-path 4.2s ease-in-out infinite;
+  animation-delay: -0.24s;
+}
+
+/* ---- comet: bright core + particle ribbon (staggered delays) ---- */
+.demo-core {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--demo-primary);
+  box-shadow: 0 0 9px var(--demo-accent);
+  animation: fx-demo-path 3.6s ease-in-out infinite;
+}
+.demo-trail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: var(--demo-accent);
+  box-shadow: 0 0 6px var(--demo-accent);
+  animation: fx-demo-path 3.6s ease-in-out infinite;
+}
+.demo-trail.d1 { width: 6px;   height: 6px;   opacity: 0.75; animation-delay: -0.1s; }
+.demo-trail.d2 { width: 5px;   height: 5px;   opacity: 0.55; animation-delay: -0.21s; }
+.demo-trail.d3 { width: 4px;   height: 4px;   opacity: 0.4;  animation-delay: -0.32s; }
+.demo-trail.d4 { width: 3px;   height: 3px;   opacity: 0.28; animation-delay: -0.44s; }
+
+/* ---- classic: minimal dot + delayed glass ring ---- */
+.demo-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--demo-primary);
+  box-shadow: 0 0 7px var(--demo-accent);
+  animation: fx-demo-path 3.8s ease-in-out infinite;
+}
+.demo-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  margin: -9px 0 0 -9px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--demo-primary) 60%, transparent);
+  animation: fx-demo-path 3.8s ease-in-out infinite;
+  animation-delay: -0.16s;
+}
+
+/* ---- aurora-trail: multi-hue gradient ribbon (Wave 11 §12) ---- */
+.demo-ribbon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--demo-primary), var(--demo-accent));
+  animation: fx-demo-path 3.8s ease-in-out infinite;
+}
+.demo-ribbon.r1 { width: 14px; height: 6px; opacity: 0.8;  transform: rotate(-8deg); filter: hue-rotate(18deg); animation-delay: -0.12s; }
+.demo-ribbon.r2 { width: 11px; height: 5px; opacity: 0.55; transform: rotate(-10deg); filter: hue-rotate(42deg); animation-delay: -0.26s; }
+.demo-ribbon.r3 { width: 8px;  height: 4px; opacity: 0.32; transform: rotate(-12deg); filter: hue-rotate(66deg) blur(0.5px); animation-delay: -0.4s; }
+
+/* ---- magnetic-spark: embers that flare and fade along the flight path ---- */
+@keyframes fx-demo-pulse {
+  0% { opacity: 0; }
+  12% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+.demo-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 255 255 / 0.95), var(--demo-accent) 55%, transparent 78%);
+  box-shadow: 0 0 6px var(--demo-accent);
+  animation:
+    fx-demo-path 3.6s ease-in-out infinite,
+    fx-demo-pulse 0.9s ease-out infinite;
+}
+.demo-spark.s1 { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; animation-delay: 0s, -0.15s; }
+.demo-spark.s2 { width: 4px; height: 4px; margin: -2px 0 0 -2px;     animation-delay: 0s, -0.45s; }
+.demo-spark.s3 { width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; animation-delay: 0s, -0.7s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-orb,
+  .demo-tail,
+  .demo-core,
+  .demo-trail,
+  .demo-dot,
+  .demo-ring,
+  .demo-ribbon,
+  .demo-spark {
+    animation: none;
+    transform: translate(90px, 38px);
+  }
+}

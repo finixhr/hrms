@@ -1,0 +1,118 @@
+{
+  "run": {
+    "status": "CALCULATED",
+    "employeeCount": 1,
+    "totals": {
+      "gross": 26000,
+      "grossPaisa": "2600000",
+      "ot": 0,
+      "otPaisa": "0",
+      "bonus": 0,
+      "bonusPaisa": "0",
+      "deduction": 0,
+      "deductionPaisa": "0",
+      "ait": 161,
+      "aitPaisa": "16100",
+      "net": 25839,
+      "netPaisa": "2583900"
+    }
+  },
+  "entries": [
+    {
+      "money": {
+        "gross": 26000,
+        "grossPaisa": "2600000",
+        "ot": 0,
+        "otPaisa": "0",
+        "bonus": 0,
+        "bonusPaisa": "0",
+        "commission": 0,
+        "commissionPaisa": "0",
+        "absence": 0,
+        "absencePaisa": "0",
+        "late": 0,
+        "latePaisa": "0",
+        "loan": 0,
+        "loanPaisa": "0",
+        "advance": 0,
+        "advancePaisa": "0",
+        "other": 0,
+        "otherPaisa": "0",
+        "guarantor": 0,
+        "guarantorPaisa": "0",
+        "ait": 161,
+        "aitPaisa": "16100",
+        "net": 25839,
+        "netPaisa": "2583900"
+      },
+      "presentDays": 13,
+      "absentDays": 0,
+      "leaveDays": 0,
+      "lateMinutes": 0,
+      "otMinutes": 0,
+      "breakdown": {
+        "earnings": [
+          {
+            "label": "Basic (prorated)",
+            "amount": 15000
+          },
+          {
+            "label": "House Rent (prorated)",
+            "amount": 7500
+          },
+          {
+            "label": "Medical (prorated)",
+            "amount": 2500
+          },
+          {
+            "label": "Conveyance (prorated)",
+            "amount": 1000
+          }
+        ],
+        "deductions": [
+          {
+            "label": "AIT (FY 2026-27 (Income Tax Act 2023))",
+            "amount": 161
+          }
+        ],
+        "attendance": {
+          "presentDays": 13,
+          "absentDays": 0,
+          "leaveDays": 0,
+          "lateMinutes": 0,
+          "lateDays": 0,
+          "otMinutes": 0,
+          "workingDays": 26
+        },
+        "gross": 26000,
+        "otAmount": 0,
+        "bonus": 0,
+        "commission": 0,
+        "bonusLines": [],
+        "deductionLines": [],
+        "absenceDeduction": 0,
+        "lateDeduction": 0,
+        "earlyLeaveDeduction": 0,
+        "repeatOffenderPenalty": 0,
+        "loanDeduction": 0,
+        "advanceDeduction": 0,
+        "otherDeduction": 0,
+        "otTiers": {},
+        "ait": {
+          "netMonthlyAit": 161,
+          "ruleSetName": "FY 2026-27 (Income Tax Act 2023)",
+          "mode": "SLAB"
+        },
+        "net": 25839,
+        "proration": {
+          "frequency": "MONTHLY",
+          "fraction": 0.5,
+          "weekWorkingDays": 26,
+          "monthWorkingDays": 26,
+          "serviceDays": 13,
+          "joiningDate": "2026-07-16"
+        }
+      }
+    }
+  ]
+}

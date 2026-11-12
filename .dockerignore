@@ -1,0 +1,21 @@
+node_modules
+.next
+.git
+.gitignore
+*.zip
+*.md
+!DEPLOYMENT-GUIDE.md
+download
+dist
+coverage
+.env
+.env.*
+!.env.example
+pg
+agent-ctx
+tool-results
+docker-compose.yml
+# T2-002 / MAIN-001: never bake backup dumps or local secrets into the image
+backups/
+*.dump
+*.dump.enc

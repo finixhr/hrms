@@ -1,0 +1,10 @@
+[Unit]
+Description=Finix HR — quarterly restore drill timer
+
+[Timer]
+OnCalendar=*-01,04,07,10-01 05:00:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

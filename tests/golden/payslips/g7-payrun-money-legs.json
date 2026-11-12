@@ -1,0 +1,78 @@
+{
+  "run": {
+    "status": "PAID",
+    "journalPresent": true,
+    "totals": {
+      "net": 6250,
+      "netPaisa": "625000"
+    }
+  },
+  "entries": [
+    {
+      "payslipNumber": "PS-202607-0001",
+      "status": "INCLUDED",
+      "net": 6250,
+      "netPaisa": "625000",
+      "loanDeduction": 4000,
+      "bonus": 1500,
+      "otherDeduction": 250
+    }
+  ],
+  "journals": [
+    {
+      "amount": 6250,
+      "lines": [
+        {
+          "account": "5100",
+          "debit": 10500,
+          "credit": 0
+        },
+        {
+          "account": "2105",
+          "debit": 0,
+          "credit": 0
+        },
+        {
+          "account": "2100",
+          "debit": 0,
+          "credit": 6250
+        },
+        {
+          "account": "1150",
+          "debit": 0,
+          "credit": 4000
+        },
+        {
+          "account": "1155",
+          "debit": 0,
+          "credit": 0
+        },
+        {
+          "account": "5290",
+          "debit": 0,
+          "credit": 250
+        }
+      ]
+    }
+  ],
+  "loan": {
+    "paidAmount": 12000,
+    "outstanding": 36000,
+    "status": "ACTIVE"
+  },
+  "installments": [
+    {
+      "no": 3,
+      "amount": 4000,
+      "paidAmount": 4000,
+      "status": "PAID",
+      "linkedToEntry": true
+    }
+  ],
+  "bonus": {
+    "status": "PAID"
+  },
+  "deduction": {
+    "status": "PAID"
+  }
+}

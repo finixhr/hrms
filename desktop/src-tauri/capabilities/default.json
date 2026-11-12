@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "DSK-2 remediation — capability for the main window. Grants the default core permission set (path, event, window, webview, app, image, resources, menu, tray) so the bundled launcher UI (../ui) gets a working IPC bridge now that app.withGlobalTauri is enabled in tauri.conf.json. The app's own commands registered in the invoke_handler (app_version, clear_session) are allowed on local app origins by the Tauri 2 ACL default for application commands, so they need no explicit permission entries here; remote pages (a connected server) resolve to a Remote origin and are denied unless a remote capability explicitly grants them.",
+  "local": true,
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}

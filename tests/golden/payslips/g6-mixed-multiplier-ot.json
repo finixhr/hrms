@@ -1,0 +1,100 @@
+{
+  "run": {
+    "status": "CALCULATED",
+    "employeeCount": 1,
+    "totals": {
+      "gross": 20800,
+      "grossPaisa": "2080000",
+      "ot": 350,
+      "otPaisa": "35000",
+      "bonus": 0,
+      "bonusPaisa": "0",
+      "deduction": 19200,
+      "deductionPaisa": "1920000",
+      "ait": 0,
+      "aitPaisa": "0",
+      "net": 1950,
+      "netPaisa": "195000"
+    }
+  },
+  "entries": [
+    {
+      "money": {
+        "gross": 20800,
+        "grossPaisa": "2080000",
+        "ot": 350,
+        "otPaisa": "35000",
+        "bonus": 0,
+        "bonusPaisa": "0",
+        "commission": 0,
+        "commissionPaisa": "0",
+        "absence": 19200,
+        "absencePaisa": "1920000",
+        "late": 0,
+        "latePaisa": "0",
+        "loan": 0,
+        "loanPaisa": "0",
+        "advance": 0,
+        "advancePaisa": "0",
+        "other": 0,
+        "otherPaisa": "0",
+        "guarantor": 0,
+        "guarantorPaisa": "0",
+        "ait": 0,
+        "aitPaisa": "0",
+        "net": 1950,
+        "netPaisa": "195000"
+      },
+      "presentDays": 2,
+      "absentDays": 24,
+      "leaveDays": 0,
+      "lateMinutes": 0,
+      "otMinutes": 120,
+      "breakdown": {
+        "earnings": [
+          {
+            "label": "Basic",
+            "amount": 20800
+          }
+        ],
+        "deductions": [
+          {
+            "label": "Absence (24d)",
+            "amount": 19200
+          }
+        ],
+        "attendance": {
+          "presentDays": 2,
+          "absentDays": 24,
+          "leaveDays": 0,
+          "lateMinutes": 0,
+          "lateDays": 0,
+          "otMinutes": 120,
+          "workingDays": 26
+        },
+        "gross": 20800,
+        "otAmount": 350,
+        "bonus": 0,
+        "commission": 0,
+        "bonusLines": [],
+        "deductionLines": [],
+        "absenceDeduction": 19200,
+        "lateDeduction": 0,
+        "earlyLeaveDeduction": 0,
+        "repeatOffenderPenalty": 0,
+        "loanDeduction": 0,
+        "advanceDeduction": 0,
+        "otherDeduction": 0,
+        "otTiers": {
+          "weekday": 120
+        },
+        "ait": {
+          "netMonthlyAit": 0,
+          "ruleSetName": "FY 2026-27 (Income Tax Act 2023)",
+          "mode": "SLAB"
+        },
+        "net": 1950
+      }
+    }
+  ]
+}

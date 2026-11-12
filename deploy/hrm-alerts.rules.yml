@@ -1,0 +1,308 @@
+# ============ Prometheus alert-rule starter (audit L-34) ============
+# The app exposes Prometheus-format metrics at /api/metrics (auth-gated by
+# the HRM_INTERNAL_TOKEN header — see .env.example). This file is a STARTER
+# rule set for the three operational failure modes the audit called out:
+# the app being down, the background-job queue backing up, and device
+# ingest silently dying.
+#
+# OPS-2 (2026-11-09 P1 wave) — the rule set grew the four missing failure
+# classes: HOST DISK, HTTP ERROR RATE, LATENCY and DATABASE (groups
+# hrm-host, hrm-request-plane, hrm-database below). Metric names are the
+# ACTUAL names exported at /api/metrics (src/hrm-server/metrics.ts):
+#   - errors:  hrm_rpc_errors_total{family}   (monotonic since process start)
+#   - volume:  hrm_rpc_requests_total{family} (monotonic since process start)
+#   - latency: hrm_rpc_duration_ms_p95{family} — the metrics plane DELIBERATELY
+#     ships pre-computed percentiles from in-memory rings (bounded-cardinality
+#     family design, OPS-4 metrics rework) instead of histogram buckets, so
+#     there is nothing for histogram_quantile() to consume — alert on the
+#     exported p95 gauge directly.
+# The rpc errors metric counts EVERY non-OK RPC response (4xx and 5xx alike —
+# the dispatcher does not split by status class at the metrics plane), so the
+# error-rate rules below are STRICTER than a 5xx-only rule: an elevated 4xx
+# rate (validation storms, throttle trips) pages as well.
+# Two extra scrape jobs power the new groups (both optional — see each rule):
+#   - job "node"     — node_exporter on the app/db host (disk rules)
+#   - job "postgres" — postgres_exporter against the PostgreSQL server
+#     (connection-saturation rules; rules without the job configured simply
+#     never fire — no absent() traps)
+#
+# Deploy (Prometheus):
+#   prometheus --config.file=...  with rule_files pointing here, e.g.
+#   rule_files: ["/etc/prometheus/hrm-alerts.rules.yml"]
+# The scrape job must send the internal token header:
+#   - job_name: hrm
+#     scrape_interval: 30s
+#     metrics_path: /api/metrics
+#     authorization:
+#       type: Bearer
+#       credentials: <HRM_INTERNAL_TOKEN>
+#
+# Tune the `for:` windows and thresholds to your deployment before use —
+# these defaults fit a single-instance ~200-employee tenant.
+
+groups:
+  - name: hrm-availability
+    rules:
+      # scrape target gone / app down / token rotated without updating Prometheus
+      - alert: HrmInstanceDown
+        expr: up{job="hrm"} == 0 or absent(up{job="hrm"})
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HRM metrics target is down ({{ $labels.instance }})"
+          description: >-
+            /api/metrics has been unreachable for 3 minutes — the app process,
+            Caddy, or the scrape token is broken. Check `systemctl status hrm`
+            and the token in the Prometheus scrape config.
+
+      # crash-loop signature: a young process that keeps restarting
+      - alert: HrmRestartLoop
+        expr: hrm_uptime_seconds < 120
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HRM process keeps restarting (uptime < 2m for 10m)"
+          description: >-
+            The process uptime has stayed under 2 minutes for 10 minutes —
+            crash-looping. Inspect logs/hrm.log and journalctl -u hrm.
+
+  - name: hrm-background-jobs
+    rules:
+      # mailer/SMS sweeper backlog (payroll notices, doc-expiry, attendance alerts)
+      - alert: HrmBgJobQueueBacklog
+        expr: hrm_bgjob_pending > 50
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Background-job queue backing up ({{ $value }} pending)"
+          description: >-
+            More than 50 background jobs have been pending for 15 minutes —
+            the job tick may be stalled or a sender is timing out.
+
+      - alert: HrmBgJobFailures
+        expr: increase(hrm_bgjob_failed[1h]) > 10
+        labels:
+          severity: warning
+        annotations:
+          summary: "Background jobs failing terminally ({{ $value }} in 1h)"
+          description: >-
+            Failed (terminal) background jobs in the last hour — check
+            CommunicationLog rows and the email/SMS gateway settings.
+
+  - name: hrm-device-plane
+    rules:
+      # ADMS/ISAPI ingest: raw events piling up unprocessed (sweeper stalled)
+      - alert: HrmDeviceIngestBacklog
+        expr: hrm_zkteco_raw_received > 200
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Raw device events awaiting processing ({{ $value }})"
+          description: >-
+            The ADMS sweeper is not keeping up (or is dead) — biometric
+            punches will appear late. Check Sync Monitor and the sweeper lock.
+
+      - alert: HrmDeviceDeadLetters
+        expr: increase(hrm_zkteco_raw_dead_letter[1h]) > 0
+        labels:
+          severity: info
+        annotations:
+          summary: "Device events dead-lettered ({{ $value }} in 1h)"
+          description: >-
+            Raw device events were moved to dead-letter status — inspect the
+            Sync Monitor out-of-window/error counters and the device clock.
+
+      - alert: HrmAllDevicesOffline
+        expr: hrm_devices_online == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No attendance devices report online"
+          description: >-
+            Every biometric terminal is offline for 30 minutes — network,
+            gateway, or Caddy device-plane issue (deploy/Caddyfile).
+
+  # ---- OPS-2 (2026-11-09 P1 wave) — host disk space --------------------
+  # Requires a node_exporter scrape job named "node" on the app/db host:
+  #   - job_name: node
+  # (without it these rules stay silent — no series, no alert).
+  # The deployment is single-node (systemd + Caddy, DEPLOYMENT-GUIDE.md) so
+  # "/" carries the app, PostgreSQL and the backups/ dir; duplicate these
+  # two rules per extra mountpoint (e.g. a dedicated /var/lib/postgresql or
+  # /srv volume) with mountpoint="..." selectors.
+  - name: hrm-host
+    rules:
+      - alert: HrmDiskUsageHigh
+        expr: (node_filesystem_avail_bytes{job="node",mountpoint="/",fstype!~"tmpfs|devtmpfs|squashfs|iso9660"} / node_filesystem_size_bytes{job="node",mountpoint="/",fstype!~"tmpfs|devtmpfs|squashfs|iso9660"}) < 0.20
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Root filesystem below 20% free ({{ $labels.instance }})"
+          description: >-
+            Less than 20% of the root filesystem has been free for 30 minutes.
+            The same disk carries PostgreSQL WAL, pg_dump snapshots (backups/)
+            and the app logs — a full disk turns into failed backups AND a
+            write-refusing database. Clean old backups/ artifacts and check
+            `df -h /` and `du -sh /var/lib/postgresql`.
+
+      - alert: HrmDiskUsageCritical
+        expr: (node_filesystem_avail_bytes{job="node",mountpoint="/",fstype!~"tmpfs|devtmpfs|squashfs|iso9660"} / node_filesystem_size_bytes{job="node",mountpoint="/",fstype!~"tmpfs|devtmpfs|squashfs|iso9660"}) < 0.10
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Root filesystem below 10% free ({{ $labels.instance }})"
+          description: >-
+            Less than 10% of the root filesystem has been free for 15 minutes —
+            PostgreSQL stops accepting writes when the disk fills. Free space
+            NOW (prune backups/, rotate logs/) before the database goes
+            read-only; see deploy/logrotate.conf and scripts/backup.sh
+            retention (BACKUP_KEEP_DAYS).
+
+  # ---- OPS-2 (2026-11-09 P1 wave) — RPC error rate + p95 latency --------
+  # hrm_rpc_errors_total / hrm_rpc_requests_total are rendered with
+  # `# TYPE gauge` by the single exposition helper but are MONOTONIC since
+  # process start (reset to 0 on restart — rate() handles the reset), so
+  # rate() is valid on them. The errors series counts every non-OK RPC
+  # response (4xx + 5xx): see the header note for why this is stricter than
+  # a 5xx-only rule.
+  - name: hrm-request-plane
+    rules:
+      - alert: HrmRpcErrorRateHigh
+        expr: sum(rate(hrm_rpc_errors_total[10m])) / sum(rate(hrm_rpc_requests_total[10m])) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RPC error rate above 2% for 10 minutes"
+          description: >-
+            More than 2% of RPC responses have been errors (any non-OK status —
+            5xx crashes as well as 4xx validation/throttle storms) for 10
+            minutes. Check the slowest/erroring module family in the Owner
+            Console → Performance panel (hrm_rpc_errors_total by family) and
+            journalctl -u hrm for stack traces.
+
+      - alert: HrmRpcErrorRateSevere
+        expr: sum(rate(hrm_rpc_errors_total[5m])) / sum(rate(hrm_rpc_requests_total[5m])) > 0.10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RPC error rate above 10% — the tenant plane is failing"
+          description: >-
+            More than 10% of RPC responses have been errors for 5 minutes —
+            treat as a partial outage. Compare with HrmRestartLoop and
+            HrmDatabaseUnreachable to decide between a crash-loop and a
+            database outage; Caddy still answers (so up{job="hrm"} stays 1)
+            while every business call fails.
+
+      # p95 latency on the exported percentile gauges (see header: the
+      # metrics plane ships pre-computed percentiles — no histogram buckets
+      # exist, so no histogram_quantile()). 1500 ms = ~2x the 800 ms p95 SLO
+      # from loadtest/README.md; the per-family label names the offender.
+      - alert: HrmRpcLatencyP95High
+        expr: hrm_rpc_duration_ms_p95 > 1500
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RPC p95 latency above 1.5s — module family {{ $labels.family }}"
+          description: >-
+            The p95 of the "{{ $labels.family }}" module family has exceeded
+            1500 ms for 10 minutes (SLO: p95 < 800 ms). Check the family's
+            query path (Owner Console → Performance panel sorts by p95),
+            pg_stat_activity for lock waits, and recent deploys.
+
+      - alert: HrmRpcLatencyP95Severe
+        expr: hrm_rpc_duration_ms_p95 > 3000
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RPC p95 latency above 3s — module family {{ $labels.family }}"
+          description: >-
+            The p95 of the "{{ $labels.family }}" module family has exceeded
+            3 seconds for 5 minutes — users are effectively blocked on that
+            module. If several families degrade together, suspect the database
+            (see the hrm-database group) rather than one route.
+
+  # ---- OPS-2 (2026-11-09 P1 wave) — database plane ----------------------
+  # Three signals, in order of certainty:
+  #   1. HrmDatabaseUnreachable — the APP cannot run its COUNT gauges: the
+  #      metrics TTL cache records -1 on failure (metrics.ts cachedCount),
+  #      so any hrm_*_pending == -1 means the last (30s-cached) DB round
+  #      FAILED. No extra exporter needed — this works on the plain hrm job.
+  #   2. HrmPostgresDown — requires a postgres_exporter scrape job named
+  #      "postgres" (deliberately NO absent(): without the job the rule
+  #      stays silent instead of paging every deployment that never
+  #      configured it).
+  #   3. Connection saturation — same postgres job, pg_stat_activity_count
+  #      vs pg_settings_max_connections (single-server shape: scalar()).
+  #      When PgBouncer (docker-compose "pooling" profile) fronts the
+  #      database, watch the pooler's own metrics too.
+  # Replication lag: no replica exists in the single-node starter topology
+  # (HRM_BACKUP_SOURCE_URL points at one when it does) — add a
+  # pg_replication_lag rule when a replica is introduced.
+  - name: hrm-database
+    rules:
+      - alert: HrmDatabaseUnreachable
+        expr: hrm_bgjob_pending == -1 or hrm_employees_total == -1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The app cannot query PostgreSQL (COUNT gauges at -1)"
+          description: >-
+            The DB-derived gauges at /api/metrics have read -1 (cachedCount
+            failure sentinel) for 5 minutes — every background COUNT is
+            failing while the app process itself stays up (HrmInstanceDown
+            does NOT fire). Check PostgreSQL (systemctl status postgresql,
+            pg_isready) and connection-pool exhaustion; the app recovers
+            automatically once the database answers again.
+
+      - alert: HrmPostgresDown
+        expr: up{job="postgres"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL exporter target is down ({{ $labels.instance }})"
+          description: >-
+            The postgres_exporter scrape has failed for 3 minutes — PostgreSQL
+            is down or the exporter lost its credentials. Check
+            `systemctl status postgresql` and pg_isready; expect
+            HrmDatabaseUnreachable to fire from the app side as well.
+
+      - alert: HrmPostgresConnectionSaturation
+        expr: sum(pg_stat_activity_count{job="postgres"}) / scalar(pg_settings_max_connections{job="postgres"}) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL connections above 85% of max_connections"
+          description: >-
+            More than 85% of max_connections is in use for 10 minutes. The
+            app's Prisma pool plus PgBouncer (if enabled) should bound this —
+            a leak or an unbounded ad-hoc client is holding connections. Check
+            pg_stat_activity for idle-in-transaction sessions and raise
+            max_connections only after the leak is ruled out.
+
+      - alert: HrmPostgresConnectionExhausted
+        expr: sum(pg_stat_activity_count{job="postgres"}) / scalar(pg_settings_max_connections{job="postgres"}) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL connections above 95% — exhaustion imminent"
+          description: >-
+            Less than 5% of max_connections remains — new connections (the
+            app, pg_dump backups, operators) are about to be refused. Kill
+            idle-in-transaction sessions now and find the holder leak; the
+            backup job (scripts/backup.sh) fails while the database refuses
+            connections.

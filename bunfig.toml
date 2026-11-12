@@ -1,0 +1,16 @@
+[test]
+# C-01 test infra — the preload selects the ISOLATED unit-test PostgreSQL
+# database (and sets DATABASE_URL) BEFORE any test file's module graph can
+# construct the PrismaClient singleton (utils.ts imports @/lib/db
+# transitively, so import-order bootstrapping inside test files is not enough).
+#
+# FIN-037 (Phase 2) — the preload is now LAZY: it only does PURE environment
+# selection (no network, no subprocess). The `prisma db push --force-reset`
+# bootstrap runs the first time a DB-backed test file imports
+# tests/unit/_testdb (top-level await). Pure-logic suites (money math, leave
+# math, AIT slabs, …) therefore run WITHOUT any database:
+#   bun test tests/unit/ait-slab-engine.test.ts     # works on a DB-less machine
+#   bun test tests/unit                             # full suite — needs PostgreSQL
+# Test DB selection: TEST_DATABASE_URL env → .env TEST_DATABASE_URL → localhost
+# default; URLs containing "production" are refused (tests never touch prod).
+preload = ["./tests/preload.ts"]

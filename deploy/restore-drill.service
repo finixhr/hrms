@@ -1,0 +1,28 @@
+[Unit]
+Description=Finix HR — quarterly restore drill
+Documentation=file:///opt/hrm/docs/BACKUP_RESTORE.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+# FORENSIC AUDIT 2026-11-10, FIN-038 (Phase 0): the restore drill uses its OWN
+# environment file — a drill-only COPY of the backup key plus the drill
+# DATABASE_URL — at /etc/systemd/system/hrm-restore-drill.env (mode 600,
+# root:root). It previously sourced the same hrm-backup.env as the nightly
+# backup: the drill host then held the live backup key in a second shared
+# surface. The drill env holds ONLY what a restore exercise needs:
+#   HRM_BACKUP_KEY=<copy of the CURRENT backup channel key>
+#   DATABASE_URL=postgresql://hrm_user:CHANGE_ME@127.0.0.1:5432/hrm_drill
+# Keep drill keys ONLY inside this drill environment; never copy them back
+# into the runtime .env / hrm.env. The quarterly drill is also the checkpoint
+# for retiring a drill env that references a retired key generation (see
+# docs/runbooks/secret-rotation.md).
+EnvironmentFile=/etc/systemd/system/hrm-restore-drill.env
+User=hrm
+Group=hrm
+WorkingDirectory=/opt/hrm
+ExecStart=/bin/bash /opt/hrm/scripts/restore-drill.sh
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/hrm/backups /tmp
+PrivateTmp=true

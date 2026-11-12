@@ -1,0 +1,1333 @@
+{
+  "models": {
+    "AccountJournal": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "AccountingPeriod": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Advance": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "AitCalculationLog": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "AitFiscalYear": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "AitTaxSlab": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "AitTaxpayerCategory": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Announcement": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "AnnouncementRead": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ApiKey": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ApiRefreshToken": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ApprovalAction": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ApprovalDelegate": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ApprovalRequest": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ApprovalStep": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ApprovalWorkflow": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Asset": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "AssetAssignment": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "AssetEvent": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Attendance": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "AttendanceCorrection": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "AttendanceDevice": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "AttendanceDeviceUser": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "AttendanceEvent": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "AttendancePolicy": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "AttendancePolicyAssignment": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "AttendancePolicyGeoFence": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "AttendanceProof": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "AttendanceRawEvent": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "AuditLog": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "BankAccount": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "BgJob": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Bonus": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "Branch": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Budget": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Camera": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CameraCredential": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CampaignBounce": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CommissionCalculationLog": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "CommissionRule": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CommissionThreshold": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CommissionThresholdImport": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CommunicationLog": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CommunicationRecipient": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "Company": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CompanyEvent": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CompanySetting": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CompanyTransfer": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CoordinationLock": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "CostCenter": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Deduction": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "Department": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Designation": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "DeviceCommLog": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "DeviceCommand": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "DeviceToken": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Education": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "Employee": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "EmployeeConsent": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "EmployeeDevice": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "EmployeeDocument": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "EmployeeHistory": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "EmployeeTrackingState": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "ExitClearance": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ExpenseClaim": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "FamilyMember": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "FinalSettlement": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "GeoFence": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "GoodsReceiptConfirmation": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "GoodsRequisition": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": true,
+      "employeeRelation": false
+    },
+    "GoodsRequisitionHistory": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "GoodsRequisitionItem": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Holiday": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "HrLetter": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "HrSetting": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "InventoryItemSerial": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "Item": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ItemCategory": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ItemUnit": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "JobApplication": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "JobInterview": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "JobOpening": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "KpiAchievement": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "KpiApprovalAction": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "KpiAssignment": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "KpiAssignmentIndicator": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "KpiBatch": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "KpiIndicator": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "KpiRevision": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "KpiTemplate": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "LeaveBalance": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "LeaveRequest": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "LeaveType": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "LetterRequest": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "LetterTemplate": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Loan": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "LoanInstallment": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "LoginAuditLog": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Notification": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "OfferLetter": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "OnboardingTask": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "OutboxEvent": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "PayrollEntry": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "PayrollRun": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "PerformanceReview": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "PfContribution": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "PfEnrollment": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "PreviousEmployment": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "Promotion": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "PurchaseQuotation": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "PurchaseQuotationItem": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "PurchaseRequest": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "PurchaseRequestItem": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "PushSubscription": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Referee": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "ReportDeliveryLog": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ReportTemplate": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Resignation": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "ReviewCycle": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Role": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasAuditLog": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasBackupRun": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasCampaign": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasCampaignRecipient": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasCmsClient": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasCmsFeature": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasCmsMedia": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasCmsPage": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasCmsTestimonial": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasCommunicationTemplate": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasContactInquiry": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasExpiryNotice": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasInvoice": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasLiveSupportRequest": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasOtpCode": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasOwnerMfaSecret": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasOwnerRole": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasOwnerSession": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasOwnerUser": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasPayment": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasPlan": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasPlanChangeRequest": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasRegistration": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasSetting": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasSiteSetting": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasSmsMessage": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasSubscription": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasSubscriptionEvent": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasSupportAccessSession": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasSupportMessage": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasSupportTicket": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SaasTenantOverride": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SalaryRevision": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "SalaryStructure": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "SalaryTemplate": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "SequenceCounter": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Session": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Shift": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "ShiftAssignment": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "StockEntry": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "StockEntryItem": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "StockLevel": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "StockTransaction": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "StorageObject": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Supplier": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Task": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "TaxExemption": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "TaxRuleSet": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "TaxSlab": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Throttle": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "TrackingPoint": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "Transfer": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "UsageRollup": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "UsageSnapshot": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "User": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "UserCompanyAccess": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": true,
+      "employeeRelation": false
+    },
+    "UserMfaSecret": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Vendor": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Visit": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "VisitLocation": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "VisitPlan": {
+      "strategy": "employee-child-relation",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": true,
+      "employeeRelation": true
+    },
+    "VisitPlanItem": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "Warehouse": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "WebAuthnChallenge": {
+      "strategy": "saas-plane",
+      "vendorId": false,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "WebAuthnCredential": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "WebhookDelivery": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "WebhookEndpoint": {
+      "strategy": "vendor-plane",
+      "vendorId": true,
+      "companyId": false,
+      "employeeId": false,
+      "employeeRelation": false
+    },
+    "WorkforceSnapshot": {
+      "strategy": "direct-company",
+      "vendorId": true,
+      "companyId": true,
+      "employeeId": false,
+      "employeeRelation": false
+    }
+  },
+  "meta": {
+    "registryVersion": 2,
+    "generated": "2026-11-10",
+    "finding": "FIN-027 (Phase 2) \u2014 model isolation registry",
+    "policy": "Every Prisma model declares HOW it is isolated. Strategies: direct-company (companyId column \u2014 the company condition composes directly); employee-child-relation (Prisma Employee relation \u2014 company scope composes through scopedEmployeeRelationWhere's JOIN, no materialized id lists); vendor-plane (vendorId only \u2014 isolation by query-time composition; every read/write path must carry its scope through employeeScopeFilter/scopedEmployeeWhere or a parent linkage); saas-plane (no vendorId \u2014 platform tables outside the tenant plane). scripts/check-model-isolation.mjs ENFORCES this registry in CI: a model missing from the registry fails the gate, a registry entry without its model fails the gate, and a declared strategy that does not match the schema's structure fails the gate. The materialized employee-child strategy is FORBIDDEN since FIN-017 (performance: id-list IN-clauses at 5k-50k employees).",
+    "counts": {
+      "direct-company": 46,
+      "employee-child-relation": 50,
+      "vendor-plane": 66,
+      "saas-plane": 26
+    },
+    "classifierFix": "v2 (FIN-027 Phase 2): nullable `employee Employee?` relations (the 7 OPTIONAL employeeId-nullable models) count as employee-child-relation \u2014 they physically carry the relation from 9_wave9zzam."
+  }
+}
